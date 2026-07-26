@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Raízes do Nordeste - Suíte Acadêmica de Aceitação" tests="35" time="2.555">
+  <testsuite name="01 - Autenticação / T01 - Login ADMIN (sucesso)" id="2cb56a98-e9cc-4506-a011-8ea8fb180883" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.636">
+    <testcase name="Status code is 200" time="0.636" classname="01AutenticacaoT01LoginAdminSucesso"/>
+    <testcase name="Resposta contém X-Request-ID gerado" time="0.636" classname="01AutenticacaoT01LoginAdminSucesso"/>
+  </testsuite>
+  <testsuite name="01 - Autenticação / T02 - Login CLIENTE (sucesso)" id="901c5403-2f03-4c6c-8708-7b3302bf5fe9" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.256">
+    <testcase name="Status code is 200" time="0.256" classname="01AutenticacaoT02LoginClienteSucesso"/>
+    <testcase name="X-Request-ID informado foi propagado" time="0.256" classname="01AutenticacaoT02LoginClienteSucesso"/>
+  </testsuite>
+  <testsuite name="01 - Autenticação / T03 - Login ATENDENTE (sucesso)" id="aadfd205-1417-43a7-89af-302b072887c0" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.265">
+    <testcase name="Status code is 200" time="0.265" classname="01AutenticacaoT03LoginAtendenteSucesso"/>
+  </testsuite>
+  <testsuite name="01 - Autenticação / T04 - Login COZINHA (sucesso)" id="23275bfb-4a57-405a-988d-ef03790ad677" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.256">
+    <testcase name="Status code is 200" time="0.256" classname="01AutenticacaoT04LoginCozinhaSucesso"/>
+  </testsuite>
+  <testsuite name="01 - Autenticação / T05 - Login com credenciais inválidas (401)" id="b91cdf28-a4b3-469e-80b5-f808a4611fb9" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.261">
+    <testcase name="Status code is 401" time="0.261" classname="01AutenticacaoT05LoginComCredenciaisInvalidas401"/>
+  </testsuite>
+  <testsuite name="01 - Autenticação / T06 - Acesso sem token (401)" id="b8d16909-71c8-485e-a1c6-30274c33f2a2" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.003">
+    <testcase name="Status code is 401" time="0.003" classname="01AutenticacaoT06AcessoSemToken401"/>
+  </testsuite>
+  <testsuite name="02 - Documentos legais e cadastro / T07 - Consultar termos de uso vigentes (200)" id="7656207c-5350-476f-a0b7-55d9a4ab36b9" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.004">
+    <testcase name="Status code is 200" time="0.004" classname="02DocumentosLegaisECadastroT07ConsultarTermosDeUsoVigentes200"/>
+    <testcase name="Termos possuem versão, hash e conteúdo" time="0.004" classname="02DocumentosLegaisECadastroT07ConsultarTermosDeUsoVigentes200"/>
+  </testsuite>
+  <testsuite name="02 - Documentos legais e cadastro / T08 - Rejeitar e-mail em formato inválido (422)" id="1cdda3be-383b-46b4-a58c-d47b4294ae00" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.004">
+    <testcase name="Status code is 422" time="0.004" classname="02DocumentosLegaisECadastroT08RejeitarEMailEmFormatoInvalido422"/>
+    <testcase name="Erro identifica formato inválido" time="0.004" classname="02DocumentosLegaisECadastroT08RejeitarEMailEmFormatoInvalido422"/>
+  </testsuite>
+  <testsuite name="02 - Documentos legais e cadastro / T09 - Registrar usuário (público - 201)" id="e1fb7f12-a8e3-4b13-926b-6eeb698bac65" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.264">
+    <testcase name="Status code is 201" time="0.264" classname="02DocumentosLegaisECadastroT09RegistrarUsuarioPublico201"/>
+  </testsuite>
+  <testsuite name="02 - Documentos legais e cadastro / T10 - Impedir cadastro sem aceite dos termos (422)" id="f60353f2-db43-4b7d-88c3-c70727a74ce9" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.003">
+    <testcase name="Status code is 422" time="0.003" classname="02DocumentosLegaisECadastroT10ImpedirCadastroSemAceiteDosTermos422"/>
+    <testcase name="Erro identifica validação do aceite" time="0.003" classname="02DocumentosLegaisECadastroT10ImpedirCadastroSemAceiteDosTermos422"/>
+  </testsuite>
+  <testsuite name="03 - Catálogo e autorização por perfil / T11 - Listar produtos ativos (público - 200)" id="60a03b20-c0e3-4f51-85c6-b74bcf0e6816" timestamp="2026-07-22T15:59:44.247Z" tests="3" failures="0" errors="0" time="0.012">
+    <testcase name="Status code is 200" time="0.012" classname="03CatalogoEAutorizacaoPorPerfilT11ListarProdutosAtivosPublico200"/>
+    <testcase name="Response has content" time="0.012" classname="03CatalogoEAutorizacaoPorPerfilT11ListarProdutosAtivosPublico200"/>
+    <testcase name="Catálogo público contém somente produtos ativos" time="0.012" classname="03CatalogoEAutorizacaoPorPerfilT11ListarProdutosAtivosPublico200"/>
+  </testsuite>
+  <testsuite name="03 - Catálogo e autorização por perfil / T12 - Listar produtos com estoque da unidade" id="966ed1d8-b366-4141-8324-ab753dfb1894" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.019">
+    <testcase name="Status code is 200" time="0.019" classname="03CatalogoEAutorizacaoPorPerfilT12ListarProdutosComEstoqueDaUnidade"/>
+    <testcase name="Response has estoqueDisponivel" time="0.019" classname="03CatalogoEAutorizacaoPorPerfilT12ListarProdutosComEstoqueDaUnidade"/>
+  </testsuite>
+  <testsuite name="03 - Catálogo e autorização por perfil / T13 - Cliente tentando criar produto (403 - RBAC)" id="37ee521c-c4e8-438b-b23e-870be237947a" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.004">
+    <testcase name="Status code is 403" time="0.004" classname="03CatalogoEAutorizacaoPorPerfilT13ClienteTentandoCriarProduto403Rbac"/>
+  </testsuite>
+  <testsuite name="04 - Fidelidade, pedidos e idempotência / T14 - Rejeitar pedido com produto inexistente (404)" id="5b19f743-f4b0-4907-b1e1-19066e5d4ead" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.018">
+    <testcase name="Status code is 404" time="0.018" classname="04FidelidadePedidosEIdempotenciaT14RejeitarPedidoComProdutoInexistente404"/>
+    <testcase name="Erro informa recurso inexistente" time="0.018" classname="04FidelidadePedidosEIdempotenciaT14RejeitarPedidoComProdutoInexistente404"/>
+  </testsuite>
+  <testsuite name="04 - Fidelidade, pedidos e idempotência / T15 - Impedir resgate sem consentimento LGPD (409)" id="a4af6dc2-4b5f-4f90-b4df-8a1036abd2a7" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.009">
+    <testcase name="Status code is 409" time="0.009" classname="04FidelidadePedidosEIdempotenciaT15ImpedirResgateSemConsentimentoLgpd409"/>
+  </testsuite>
+  <testsuite name="04 - Fidelidade, pedidos e idempotência / T16 - Conceder consentimento de fidelidade (201)" id="c5c1dbf0-7b62-4e08-827b-161f37225f28" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.008">
+    <testcase name="Status code is 201" time="0.008" classname="04FidelidadePedidosEIdempotenciaT16ConcederConsentimentoDeFidelidade201"/>
+  </testsuite>
+  <testsuite name="04 - Fidelidade, pedidos e idempotência / T17 - Criar pedido usando pontos (201)" id="2102c641-dc6a-41de-924c-75d9b2ee3ed3" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.023">
+    <testcase name="Status code is 201" time="0.023" classname="04FidelidadePedidosEIdempotenciaT17CriarPedidoUsandoPontos201"/>
+    <testcase name="Desconto was applied" time="0.023" classname="04FidelidadePedidosEIdempotenciaT17CriarPedidoUsandoPontos201"/>
+  </testsuite>
+  <testsuite name="04 - Fidelidade, pedidos e idempotência / T18 - Criar pedido com chave idempotente (201)" id="25ef6e2e-32d5-47bf-a37d-418237a3e18f" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.010">
+    <testcase name="Status code is 201" time="0.010" classname="04FidelidadePedidosEIdempotenciaT18CriarPedidoComChaveIdempotente201"/>
+  </testsuite>
+  <testsuite name="04 - Fidelidade, pedidos e idempotência / T19 - Repetir pedido com a mesma chave e conteúdo (201)" id="8c4ee6ae-c964-44d3-adce-6f724f036bd8" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.008">
+    <testcase name="Status code is 201" time="0.008" classname="04FidelidadePedidosEIdempotenciaT19RepetirPedidoComAMesmaChaveEConteudo201"/>
+  </testsuite>
+  <testsuite name="04 - Fidelidade, pedidos e idempotência / T20 - Pedido com estoque insuficiente (409)" id="0a07c16f-93c1-4b45-a5bd-20b3a606f007" timestamp="2026-07-22T15:59:44.247Z" tests="3" failures="0" errors="0" time="0.006">
+    <testcase name="Status code is 409 Conflict" time="0.006" classname="04FidelidadePedidosEIdempotenciaT20PedidoComEstoqueInsuficiente409"/>
+    <testcase name="Error code is ESTOQUE_INSUFICIENTE" time="0.006" classname="04FidelidadePedidosEIdempotenciaT20PedidoComEstoqueInsuficiente409"/>
+    <testcase name="Response segue estrutura padronizada de erro" time="0.006" classname="04FidelidadePedidosEIdempotenciaT20PedidoComEstoqueInsuficiente409"/>
+  </testsuite>
+  <testsuite name="05 - Pagamento e estados do pedido / T21 - Processar pagamento RECUSADO (201)" id="66eceffd-cd4d-4b3c-92d2-6cadd0b1bd87" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.013">
+    <testcase name="Status code is 201" time="0.013" classname="05PagamentoEEstadosDoPedidoT21ProcessarPagamentoRecusado201"/>
+  </testsuite>
+  <testsuite name="05 - Pagamento e estados do pedido / T22 - Repetir pagamento recusado com outra forma e aprovar" id="2c11df4f-fdeb-4dc8-8606-5f7e938af2e7" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.008">
+    <testcase name="Status code is 201" time="0.008" classname="05PagamentoEEstadosDoPedidoT22RepetirPagamentoRecusadoComOutraFormaEAprovar"/>
+  </testsuite>
+  <testsuite name="05 - Pagamento e estados do pedido / T23 - Consultar histórico auditável de pagamentos" id="db485194-1ca6-4ac6-bfd4-0aeeca484da9" timestamp="2026-07-22T15:59:44.247Z" tests="3" failures="0" errors="0" time="0.008">
+    <testcase name="Status code is 200" time="0.008" classname="05PagamentoEEstadosDoPedidoT23ConsultarHistoricoAuditavelDePagamentos"/>
+    <testcase name="Tentativas mantêm dados de auditoria" time="0.008" classname="05PagamentoEEstadosDoPedidoT23ConsultarHistoricoAuditavelDePagamentos"/>
+    <testcase name="Request ID correlaciona resposta e logs" time="0.008" classname="05PagamentoEEstadosDoPedidoT23ConsultarHistoricoAuditavelDePagamentos"/>
+  </testsuite>
+  <testsuite name="05 - Pagamento e estados do pedido / T24 - Impedir salto de RECEBIDO para PRONTO (409)" id="b2f23a6a-6dcf-4dc7-9451-04774eb20f52" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.007">
+    <testcase name="Status code is 409" time="0.007" classname="05PagamentoEEstadosDoPedidoT24ImpedirSaltoDeRecebidoParaPronto409"/>
+  </testsuite>
+  <testsuite name="05 - Pagamento e estados do pedido / T25 - Atualizar status - EM_PREPARACAO (200)" id="39f89e54-732d-4299-8dfc-c5d7ba46556a" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.007">
+    <testcase name="Status code is 200" time="0.007" classname="05PagamentoEEstadosDoPedidoT25AtualizarStatusEmPreparacao200"/>
+    <testcase name="Status is EM_PREPARACAO" time="0.007" classname="05PagamentoEEstadosDoPedidoT25AtualizarStatusEmPreparacao200"/>
+  </testsuite>
+  <testsuite name="05 - Pagamento e estados do pedido / T26 - Atualizar status - PRONTO (200)" id="8e7df435-c550-4e0f-ad02-1a887e9af5cf" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.007">
+    <testcase name="Status code is 200" time="0.007" classname="05PagamentoEEstadosDoPedidoT26AtualizarStatusPronto200"/>
+    <testcase name="Status is PRONTO" time="0.007" classname="05PagamentoEEstadosDoPedidoT26AtualizarStatusPronto200"/>
+  </testsuite>
+  <testsuite name="05 - Pagamento e estados do pedido / T27 - Atualizar status - ENTREGUE (200)" id="97309000-87e4-4c51-a69b-0b6d81cfdda6" timestamp="2026-07-22T15:59:44.247Z" tests="2" failures="0" errors="0" time="0.007">
+    <testcase name="Status code is 200" time="0.007" classname="05PagamentoEEstadosDoPedidoT27AtualizarStatusEntregue200"/>
+    <testcase name="Status is ENTREGUE" time="0.007" classname="05PagamentoEEstadosDoPedidoT27AtualizarStatusEntregue200"/>
+  </testsuite>
+  <testsuite name="06 - Tolerância a falhas, estorno e autorização contextual / T28 - Criar pedido para teste de indisponibilidade do gateway (201)" id="728bb21a-c096-4d9e-8e09-dd86d7bd4f48" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.008">
+    <testcase name="Status code is 201" time="0.008" classname="06ToleranciaAFalhasEstornoEAutorizacaoContextualT28CriarPedidoParaTesteDeIndisponibilidadeDoGateway201"/>
+  </testsuite>
+  <testsuite name="06 - Tolerância a falhas, estorno e autorização contextual / T29 - Simular gateway indisponível sem efeitos parciais (503)" id="75d112de-6acd-46ce-bd73-acb6d7c6c0bc" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.006">
+    <testcase name="Status code is 503" time="0.006" classname="06ToleranciaAFalhasEstornoEAutorizacaoContextualT29SimularGatewayIndisponivelSemEfeitosParciais503"/>
+  </testsuite>
+  <testsuite name="06 - Tolerância a falhas, estorno e autorização contextual / T30 - Repetir pagamento após indisponibilidade e aprovar (201)" id="7c5dd74f-7b63-4052-a240-35ed50d34539" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.008">
+    <testcase name="Status code is 201" time="0.008" classname="06ToleranciaAFalhasEstornoEAutorizacaoContextualT30RepetirPagamentoAposIndisponibilidadeEAprovar201"/>
+  </testsuite>
+  <testsuite name="06 - Tolerância a falhas, estorno e autorização contextual / T31 - Simular gateway indisponível durante estorno (503)" id="d0c554ba-a41d-41a7-8c8a-aa9f12894b47" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.007">
+    <testcase name="Status code is 503" time="0.007" classname="06ToleranciaAFalhasEstornoEAutorizacaoContextualT31SimularGatewayIndisponivelDuranteEstorno503"/>
+  </testsuite>
+  <testsuite name="06 - Tolerância a falhas, estorno e autorização contextual / T32 - Repetir cancelamento e confirmar estorno (200)" id="febfd377-57e6-484b-b942-b4ba090744c6" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.021">
+    <testcase name="Status code is 200" time="0.021" classname="06ToleranciaAFalhasEstornoEAutorizacaoContextualT32RepetirCancelamentoEConfirmarEstorno200"/>
+  </testsuite>
+  <testsuite name="06 - Tolerância a falhas, estorno e autorização contextual / T33 - Atendente cria pedido próprio para teste de isolamento" id="a7961e47-058d-4e97-ae67-c2f88cdc92b5" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.013">
+    <testcase name="Status code is 201" time="0.013" classname="06ToleranciaAFalhasEstornoEAutorizacaoContextualT33AtendenteCriaPedidoProprioParaTesteDeIsolamento"/>
+  </testsuite>
+  <testsuite name="06 - Tolerância a falhas, estorno e autorização contextual / T34 - Cliente não consulta pedido de outro usuário" id="49b092af-c5e5-4ebf-aa36-0300f9436632" timestamp="2026-07-22T15:59:44.247Z" tests="1" failures="0" errors="0" time="0.006">
+    <testcase name="Status code is 403" time="0.006" classname="06ToleranciaAFalhasEstornoEAutorizacaoContextualT34ClienteNaoConsultaPedidoDeOutroUsuario"/>
+  </testsuite>
+  <testsuite name="07 - Validação do contrato / T35 - Validar contrato OpenAPI (200)" id="e3a02909-a543-4870-8e23-982145c68801" timestamp="2026-07-22T15:59:44.247Z" tests="4" failures="0" errors="0" time="0.360">
+    <testcase name="Status code is 200" time="0.360" classname="07ValidacaoDoContratoT35ValidarContratoOpenApi200"/>
+    <testcase name="Contrato contém as 49 operações documentadas" time="0.360" classname="07ValidacaoDoContratoT35ValidarContratoOpenApi200"/>
+    <testcase name="Contrato declara JWT, idempotência e erros correlacionáveis" time="0.360" classname="07ValidacaoDoContratoT35ValidarContratoOpenApi200"/>
+    <testcase name="Rotas públicas não exigem bearer token" time="0.360" classname="07ValidacaoDoContratoT35ValidarContratoOpenApi200"/>
+  </testsuite>
+</testsuites>
