@@ -1,0 +1,140 @@
+@startuml
+
+' Figura 7 - fluxo crítico de criação e pagamento.
+' Recomenda-se exportar em SVG e inserir em página A4 horizontal.
+
+scale max 2400 width
+skinparam dpi 180
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  FontColor black
+  DiamondBackgroundColor white
+  DiamondBorderColor black
+  StartColor black
+  EndColor black
+  BarColor black
+}
+
+|Cliente ou atendente|
+start
+:Enviar POST /pedidos\ncom itens, unidade, canal e benefícios;
+
+|API / PedidoService|
+:Validar autenticação, perfil, cliente\ne vínculo com a unidade;
+
+if (Idempotency-Key já utilizada?) then (sim)
+  if (Conteúdo possui o mesmo hash?) then (sim)
+    :Recuperar o pedido original\nsem repetir efeitos;
+    |Cliente ou atendente|
+    :Receber HTTP 201\ncom o pedido original;
+    stop
+  else (não)
+    :Rejeitar reutilização da chave;
+    |Cliente ou atendente|
+    :Receber HTTP 409;
+    stop
+  endif
+else (não)
+endif
+
+|API / PedidoService|
+:Consolidar itens repetidos;
+:Validar unidade, produtos ativos,\nquantidades e autorização;
+
+|Estoque e benefícios|
+:Reservar estoque de forma atômica;
+:Substituir o preço regular\npelo preço de campanha vigente;
+:Aplicar cupom sobre o subtotal promocional;
+:Validar consentimento e aplicar pontos\nsobre o valor remanescente;
+
+if (Reserva e benefícios válidos?) then (não)
+  :Reverter os efeitos da transação;
+  |API / PedidoService|
+  :Produzir erro padronizado;
+  |Cliente ou atendente|
+  :Receber resposta 4xx;
+  stop
+else (sim)
+endif
+
+|API / PedidoService|
+:Persistir pedido, itens e usos de benefícios;
+:Definir AGUARDANDO_PAGAMENTO\ne prazo de expiração;
+
+|Cliente ou atendente|
+:Receber HTTP 201 com o pedido;
+:Enviar POST /pedidos/{id}/pagamento;
+
+|PagamentoService|
+:Bloquear o pedido para atualização;
+:Verificar propriedade ou vínculo\ncom a unidade;
+
+if (Reserva expirada?) then (sim)
+  |Estoque e benefícios|
+  :Cancelar pedido e compensar\nestoque, cupom e pontos;
+  |Cliente ou atendente|
+  :Receber HTTP 409;
+  stop
+else (não)
+endif
+
+|PagamentoService|
+:Validar estado, valor, ausência de\naprovação e limite de tentativas;
+
+if (Validações do pagamento atendidas?) then (não)
+  :Produzir erro padronizado\nsem nova tentativa;
+  |Cliente ou atendente|
+  :Receber resposta 4xx;
+  stop
+else (sim)
+endif
+
+|Gateway simulado|
+:Processar solicitação de pagamento;
+
+if (Gateway disponível?) then (não)
+  :Sinalizar indisponibilidade técnica;
+  |PagamentoService|
+  :Não registrar tentativa\nnem alterar o pedido;
+  |Cliente ou atendente|
+  :Receber HTTP 503;
+  stop
+else (sim)
+  :Retornar APROVADO ou RECUSADO;
+endif
+
+|PagamentoService|
+if (Resultado APROVADO?) then (sim)
+  :Persistir tentativa aprovada;
+  :Alterar pedido para RECEBIDO;
+  |Cliente ou atendente|
+  :Receber HTTP 201\ncom pagamento aprovado;
+  stop
+else (não)
+  :Persistir tentativa recusada;
+  if (Terceira recusa?) then (sim)
+    |Estoque e benefícios|
+    :Cancelar pedido e compensar\nestoque, cupom e pontos;
+    |Cliente ou atendente|
+    :Receber HTTP 201\ncom tentativa recusada\ne pedido CANCELADO;
+    stop
+  else (não)
+    |PagamentoService|
+    :Manter AGUARDANDO_PAGAMENTO;
+    |Cliente ou atendente|
+    :Receber HTTP 201\ncom tentativa recusada;
+    stop
+  endif
+endif
+
+legend bottom
+  A criação é transacional: falhas não conservam reserva ou benefícios parciais.
+  A indisponibilidade do gateway não é registrada como recusa e permite repetição segura.
+endlegend
+
+@enduml

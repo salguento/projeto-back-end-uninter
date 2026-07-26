@@ -1,0 +1,69 @@
+@startuml
+
+left to right direction
+scale max 1500 width
+skinparam dpi 150
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype polyline
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Cliente\n(App / Web / Totem)" as Cliente
+
+rectangle "Sistema Raízes do Nordeste\nAPI Back-End" {
+  package "Acesso e conta" {
+    usecase "UC01\nCadastrar-se como cliente" as UC01
+    usecase "UC02\nAutenticar-se" as UC02
+    usecase "UC05\nGerenciar a própria conta" as UC05
+  }
+
+  package "Consulta e pedidos" {
+    usecase "UC03\nConsultar catálogo" as UC03
+    usecase "UC04\nConsultar disponibilidade\npor unidade" as UC04
+    usecase "UC08\nCriar o próprio pedido" as UC08
+    usecase "UC10\nConsultar pedidos" as UC10
+    usecase "UC13\nSolicitar cancelamento" as UC13
+    usecase "UC16\nConsultar unidades" as UC16
+  }
+
+  package "Fidelidade e privacidade" {
+    usecase "UC06\nConsultar saldo de fidelidade" as UC06
+    usecase "UC07\nGerenciar consentimento\nde fidelidade" as UC07
+  }
+}
+
+Cliente -- UC01
+Cliente -- UC02
+Cliente -- UC05
+Cliente -- UC03
+Cliente -- UC04
+Cliente -- UC08
+Cliente -- UC10
+Cliente -- UC13
+Cliente -- UC16
+Cliente -- UC06
+Cliente -- UC07
+
+note bottom of UC08
+  A criação aplica as regras de reserva de estoque
+  e a ordem campanha -> cupom -> pontos.
+end note
+
+note bottom of UC13
+  O cancelamento e o eventual estorno são detalhados
+  na visão de pagamentos e cancelamentos.
+end note
+@enduml

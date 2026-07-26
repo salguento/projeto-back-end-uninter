@@ -1,0 +1,68 @@
+@startuml
+
+left to right direction
+scale max 1500 width
+skinparam dpi 150
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype polyline
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Cliente" as Cliente
+actor "Atendente" as Atendente
+actor "Administrador" as Administrador
+
+rectangle "Sistema Raízes do Nordeste\nAPI Back-End" {
+  usecase "UC11\nSolicitar pagamento" as UC11
+  usecase "UC13\nSolicitar cancelamento" as UC13
+  usecase "UC14\nCancelar pedido autorizado" as UC14
+  usecase "UC24\nProcessar estorno" as UC24
+
+  ' Organiza os casos em duas colunas, evitando uma figura excessivamente larga.
+  UC11 -[hidden]right-> UC13
+  UC11 -[hidden]down-> UC24
+  UC13 -[hidden]down-> UC14
+}
+
+actor "Sistema externo de pagamento\n(Gateway)" as Gateway
+
+Cliente -right- UC11
+Atendente -right- UC11
+Gateway -left- UC11
+
+Cliente -right- UC13
+Atendente -right- UC14
+Administrador -right- UC14
+
+Gateway -left- UC24
+
+UC24 ..> UC13 : <<extend>>\n[pagamento aprovado]
+UC24 ..> UC14 : <<extend>>\n[pagamento aprovado]
+
+note bottom of UC11
+  Na implementação, a resposta do gateway é simulada.
+  O resultado pode ser aprovação, recusa ou
+  indisponibilidade técnica. Apenas solicitações
+  processadas geram tentativa. Na indisponibilidade,
+  o pedido permanece inalterado e a repetição é segura.
+end note
+
+note bottom of UC24
+  O estorno ocorre somente quando o pedido cancelado
+  possui pagamento anteriormente aprovado.
+  A confirmação do gateway é simulada na implementação.
+end note
+@enduml

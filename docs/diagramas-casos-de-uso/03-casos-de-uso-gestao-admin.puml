@@ -1,0 +1,91 @@
+@startuml
+
+left to right direction
+scale max 1600 width
+skinparam dpi 150
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype polyline
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Gerente" as Gerente
+actor "Administrador" as Administrador
+
+rectangle "Sistema Raízes do Nordeste\nAPI Back-End" {
+  package "Acompanhamento operacional" {
+    usecase "UC02\nAutenticar-se" as UC02
+    usecase "UC04\nConsultar disponibilidade\npor unidade" as UC04
+    usecase "UC10\nConsultar pedidos" as UC10
+    usecase "UC12\nConsultar tentativas\nde pagamento" as UC12
+    usecase "UC15\nAtualizar estado operacional" as UC15
+    usecase "UC16\nConsultar unidades" as UC16
+  }
+
+  package "Cadastros administrativos" {
+    usecase "UC17\nGerenciar unidades" as UC17
+    usecase "UC18\nGerenciar usuários e perfis" as UC18
+    usecase "UC19\nGerenciar produtos" as UC19
+  }
+
+  package "Estoque e benefícios" {
+    usecase "UC20\nGerenciar estoque" as UC20
+    usecase "UC21\nMovimentar estoque" as UC21
+    usecase "UC22\nGerenciar campanhas" as UC22
+    usecase "UC23\nGerenciar cupons" as UC23
+  }
+
+  ' Mantém os três agrupamentos lado a lado para melhorar a leitura em página A4.
+  UC02 -[hidden]right-> UC17
+  UC17 -[hidden]right-> UC20
+}
+
+Gerente -- UC02
+Gerente -- UC04
+Gerente -- UC10
+Gerente -- UC12
+Gerente -- UC15
+Gerente -- UC16
+Gerente -- UC19
+Gerente -- UC20
+Gerente -- UC21
+Gerente -- UC22
+Gerente -- UC23
+
+Administrador -- UC02
+Administrador -- UC04
+Administrador -- UC10
+Administrador -- UC12
+Administrador -- UC15
+Administrador -- UC16
+Administrador -- UC17
+Administrador -- UC18
+Administrador -- UC19
+Administrador -- UC20
+Administrador -- UC21
+Administrador -- UC22
+Administrador -- UC23
+
+note bottom of UC20
+  Nos recursos vinculados a uma unidade, o gerente atua
+  somente no escopo autorizado; o administrador possui
+  acesso global.
+end note
+
+note bottom of UC04
+  O gerente consulta somente unidades vinculadas;
+  o administrador possui alcance global.
+end note
+@enduml

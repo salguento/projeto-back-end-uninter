@@ -1,0 +1,238 @@
+@startuml
+
+' DER físico baseado em V1__schema_completo.sql.
+' Recomenda-se exportar em SVG ou PNG de alta resolução e inserir em A4 horizontal.
+
+left to right direction
+scale max 2400 width
+skinparam dpi 180
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+skinparam entity {
+  BackgroundColor white
+  BorderColor black
+  FontColor black
+}
+skinparam package {
+  BackgroundColor white
+  BorderColor black
+  FontColor black
+}
+
+hide methods
+
+package "Identidade e acesso" {
+  entity "usuarios" as usuarios {
+    * id : BIGINT <<PK>>
+    --
+    nome : VARCHAR(255)
+    email : VARCHAR(255) <<UK>>
+    senha : VARCHAR(255)
+    perfil : VARCHAR(50)
+    pontos : INTEGER
+    telefone : VARCHAR(20) [0..1]
+    cpf : VARCHAR(14) [0..1]
+    anonimizado : BOOLEAN
+  }
+
+  entity "consentimentos_lgpd" as consentimentos_lgpd {
+    * id : BIGINT <<PK>>
+    --
+    usuario_id : BIGINT <<FK>>
+    finalidade : VARCHAR(50)
+    versao_termo : VARCHAR(30)
+    concedido : BOOLEAN
+    registrado_em : TIMESTAMP
+    origem : VARCHAR(50)
+  }
+
+  entity "usuario_unidade" as usuario_unidade {
+    * id : BIGINT <<PK>>
+    --
+    usuario_id : BIGINT <<FK, UK1>>
+    unidade_id : BIGINT <<FK, UK1>>
+  }
+}
+
+package "Pedidos e transações" {
+  entity "pedidos" as pedidos {
+    * id : BIGINT <<PK>>
+    --
+    usuario_id : BIGINT <<FK>>
+    cliente_id : BIGINT <<FK>> [0..1]
+    unidade_id : BIGINT <<FK>>
+    usuario_registro_id : BIGINT <<FK, UK1>> [0..1]
+    status : VARCHAR(50)
+    valor_total : DECIMAL(10,2)
+    desconto : DECIMAL(10,2)
+    pontos_utilizados : INTEGER
+    pontos_concedidos : INTEGER
+    forma_pagamento : VARCHAR(50)
+    canal_pedido : VARCHAR(50)
+    codigo_cupom : VARCHAR(50) [0..1]
+    pedido_interno : BOOLEAN
+    chave_idempotencia : VARCHAR(100) <<UK1>> [0..1]
+    hash_requisicao : VARCHAR(64) [0..1]
+    criado_em : TIMESTAMP
+    expira_em : TIMESTAMP
+  }
+
+  entity "itens_pedido" as itens_pedido {
+    * id : BIGINT <<PK>>
+    --
+    pedido_id : BIGINT <<FK>>
+    produto_id : BIGINT <<FK>>
+    quantidade : INTEGER
+    preco_unitario : DECIMAL(10,2)
+  }
+
+  entity "pagamentos" as pagamentos {
+    * id : BIGINT <<PK>>
+    --
+    pedido_id : BIGINT <<FK>>
+    forma_pagamento : VARCHAR(50)
+    valor : DECIMAL(10,2)
+    status : VARCHAR(50)
+    codigo_transacao : VARCHAR(255) [0..1]
+    codigo_estorno : VARCHAR(255) [0..1]
+    estornado_em : TIMESTAMP [0..1]
+    criado_em : TIMESTAMP
+  }
+
+  entity "cupons_usados" as cupons_usados {
+    * id : BIGINT <<PK>>
+    --
+    cupom_id : BIGINT <<FK>>
+    pedido_id : BIGINT <<FK>>
+    usuario_id : BIGINT <<FK>>
+    valor_desconto : DECIMAL(10,2)
+    utilizado_em : TIMESTAMP
+    estornado_em : TIMESTAMP [0..1]
+  }
+}
+
+package "Catálogo, unidades e benefícios" {
+  entity "unidades" as unidades {
+    * id : BIGINT <<PK>>
+    --
+    nome : VARCHAR(255)
+    endereco : VARCHAR(255)
+    cidade : VARCHAR(100) [0..1]
+    estado : VARCHAR(2) [0..1]
+    cep : VARCHAR(10) [0..1]
+    telefone : VARCHAR(20) [0..1]
+    ativo : BOOLEAN
+  }
+
+  entity "produtos" as produtos {
+    * id : BIGINT <<PK>>
+    --
+    nome : VARCHAR(255)
+    descricao : VARCHAR(500) [0..1]
+    preco_vigente : DECIMAL(10,2)
+    ativo : BOOLEAN
+  }
+
+  entity "estoques" as estoques {
+    * id : BIGINT <<PK>>
+    --
+    unidade_id : BIGINT <<FK, UK1>>
+    produto_id : BIGINT <<FK, UK1>>
+    quantidade : INTEGER
+  }
+
+  entity "movimentacoes_estoque" as movimentacoes_estoque {
+    * id : BIGINT <<PK>>
+    --
+    estoque_id : BIGINT <<FK>>
+    tipo : VARCHAR(20)
+    quantidade : INTEGER
+    saldo_anterior : INTEGER
+    saldo_posterior : INTEGER
+    motivo : VARCHAR(255)
+    ator : VARCHAR(20)
+    criado_em : TIMESTAMP
+  }
+
+  entity "campanhas" as campanhas {
+    * id : BIGINT <<PK>>
+    --
+    nome : VARCHAR(255)
+    produto_id : BIGINT <<FK>>
+    unidade_id : BIGINT <<FK>>
+    preco_promocional : DECIMAL(10,2)
+    data_inicio : TIMESTAMP
+    data_fim : TIMESTAMP
+    ativa : BOOLEAN
+  }
+
+  entity "cupons" as cupons {
+    * id : BIGINT <<PK>>
+    --
+    codigo : VARCHAR(50) <<UK>>
+    tipo_desconto : VARCHAR(20)
+    valor : DECIMAL(10,2)
+    valor_minimo_pedido : DECIMAL(10,2) [0..1]
+    unidade_id : BIGINT <<FK>> [0..1]
+    data_inicio : TIMESTAMP
+    data_fim : TIMESTAMP
+    ativo : BOOLEAN
+    uso_maximo : INTEGER [0..1]
+    uso_atual : INTEGER
+  }
+}
+
+' Identidade e escopo operacional
+usuarios ||--o{ consentimentos_lgpd : registra
+usuarios ||--o{ usuario_unidade : possui
+unidades ||--o{ usuario_unidade : vincula
+
+' Papéis distintos de usuário no pedido
+usuarios ||--o{ pedidos : "titular (usuario_id)"
+usuarios |o--o{ pedidos : "cliente (cliente_id)"
+usuarios |o--o{ pedidos : "registrador (usuario_registro_id)"
+unidades ||--o{ pedidos : recebe
+
+' Composição e histórico do pedido
+pedidos ||--o{ itens_pedido : contém
+produtos ||--o{ itens_pedido : referencia
+pedidos ||--o{ pagamentos : possui
+
+' Estoque por unidade e trilha de movimentações
+unidades ||--o{ estoques : mantém
+produtos ||--o{ estoques : posiciona
+estoques ||--o{ movimentacoes_estoque : registra
+
+' Campanhas e cupons
+unidades ||--o{ campanhas : disponibiliza
+produtos ||--o{ campanhas : promove
+unidades |o--o{ cupons : restringe
+cupons ||--o{ cupons_usados : origina
+pedidos ||--o{ cupons_usados : aplica
+usuarios ||--o{ cupons_usados : utiliza
+
+' Sugestões de posicionamento para a renderização em três blocos.
+usuarios -[hidden]right-> pedidos
+pedidos -[hidden]right-> unidades
+consentimentos_lgpd -[hidden]down-> usuario_unidade
+itens_pedido -[hidden]down-> pagamentos
+pagamentos -[hidden]down-> cupons_usados
+unidades -[hidden]down-> produtos
+produtos -[hidden]down-> estoques
+estoques -[hidden]down-> movimentacoes_estoque
+movimentacoes_estoque -[hidden]down-> campanhas
+campanhas -[hidden]down-> cupons
+
+legend bottom
+  |= Símbolo |= Significado |
+  | PK | chave primária |
+  | FK | chave estrangeira |
+  | UK | restrição de unicidade |
+  | UK1 | campos que formam uma restrição de unicidade composta |
+  | [0..1] | atributo ou relacionamento opcional |
+endlegend
+
+@enduml

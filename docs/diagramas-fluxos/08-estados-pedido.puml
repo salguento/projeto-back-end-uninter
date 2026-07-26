@@ -1,0 +1,64 @@
+@startuml
+title Figura 8 – Diagrama de estados do pedido
+
+left to right direction
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam linetype ortho
+skinparam ArrowColor #37474F
+skinparam state {
+  BackgroundColor #F7F7F7
+  BorderColor #455A64
+  FontColor #263238
+  StartColor #455A64
+  EndColor #455A64
+}
+
+state "Aguardando\npagamento" as AGUARDANDO
+state "Recebido" as RECEBIDO
+state "Em preparação" as PREPARACAO
+state "Pronto" as PRONTO
+state "Entregue" as ENTREGUE
+state "Cancelado" as CANCELADO #FCE8E6
+
+[*] --> AGUARDANDO : pedido criado e\nestoque reservado
+
+AGUARDANDO --> RECEBIDO : pagamento aprovado
+AGUARDANDO --> AGUARDANDO : pagamento recusado\n[limite não atingido]
+AGUARDANDO --> CANCELADO : reserva expirada
+AGUARDANDO --> CANCELADO : limite de tentativas atingido
+AGUARDANDO --> CANCELADO : cancelamento autorizado
+
+RECEBIDO --> PREPARACAO : iniciar preparação
+PREPARACAO --> PRONTO : concluir preparação
+PRONTO --> ENTREGUE : confirmar entrega
+
+RECEBIDO --> CANCELADO : cancelamento autorizado\n[estorno confirmado]
+PREPARACAO --> CANCELADO : cancelamento autorizado\n[estorno confirmado]
+PRONTO --> CANCELADO : cancelamento autorizado\n[estorno confirmado]
+ENTREGUE --> CANCELADO : cancelamento autorizado\n[estorno confirmado]
+
+ENTREGUE --> [*] : encerramento normal
+CANCELADO --> [*]
+
+note top of AGUARDANDO
+  A indisponibilidade do gateway não altera o estado.
+  A solicitação pode ser repetida com segurança.
+end note
+
+note bottom of CANCELADO
+  O cancelamento de uma reserva pendente devolve
+  estoque e benefícios. Após pagamento aprovado,
+  a mudança ocorre somente se o estorno for confirmado.
+  O estoque é devolvido apenas quando o pedido ainda
+  se encontra no estado Recebido.
+end note
+
+legend bottom
+  As transições operacionais devem respeitar a sequência indicada.
+  O estado Cancelado é alcançado exclusivamente pelo fluxo dedicado de cancelamento.
+endlegend
+
+@enduml

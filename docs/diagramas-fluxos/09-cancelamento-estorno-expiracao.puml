@@ -1,0 +1,134 @@
+@startuml
+
+' Figura 9 - cancelamento, estorno e expiração de pedidos.
+' Recomenda-se exportar em SVG e inserir em página A4 horizontal.
+
+scale max 2600 width
+skinparam dpi 180
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  FontColor black
+  DiamondBackgroundColor white
+  DiamondBorderColor black
+  StartColor black
+  EndColor black
+  BarColor black
+}
+
+|Origem do fluxo|
+start
+if (Qual é o gatilho?) then (solicitação de cancelamento)
+  :Cliente, atendente ou administrador envia\nPOST /pedidos/{id}/cancelamento;
+
+  |PedidoService|
+  :Localizar o pedido;
+  :Verificar autenticação e autorização por\npropriedade, unidade vinculada ou perfil ADMIN;
+
+  if (Pedido localizado e acesso autorizado?) then (não)
+    :Produzir erro padronizado;
+    |Origem do fluxo|
+    :Receber resposta 4xx;
+    stop
+  else (sim)
+  endif
+
+  |PedidoService|
+  if (Estado atual é CANCELADO?) then (sim)
+    :Rejeitar novo cancelamento;
+    |Origem do fluxo|
+    :Receber HTTP 409;
+    stop
+  else (não)
+  endif
+
+  |PedidoService|
+  if (Estado é AGUARDANDO_PAGAMENTO?) then (sim)
+    |Reserva, estoque e benefícios|
+    :Alterar o pedido para CANCELADO;
+    :Devolver ao estoque os itens reservados;
+    :Liberar o cupom e devolver os pontos utilizados;
+    :Persistir as compensações e registrar auditoria;
+
+    |Origem do fluxo|
+    :Receber HTTP 200 com o pedido cancelado;
+    stop
+  else (não — pedido pago)
+  endif
+
+  |PagamentoService|
+  :Localizar o pagamento APROVADO\nainda não estornado;
+
+  if (Existe pagamento estornável?) then (não)
+    :Rejeitar o cancelamento sem alterar o pedido;
+    |Origem do fluxo|
+    :Receber HTTP 409;
+    stop
+  else (sim)
+  endif
+
+  |Gateway simulado|
+  :Solicitar o estorno pela transação aprovada;
+
+  if (Gateway disponível?) then (não)
+    :Sinalizar indisponibilidade técnica;
+    |PagamentoService|
+    :Preservar pagamento, pedido,\nestoque e benefícios;
+    |Origem do fluxo|
+    :Receber HTTP 503;
+    stop
+  else (sim)
+    :Retornar o código de confirmação do estorno;
+  endif
+
+  |PagamentoService|
+  :Registrar código e data do estorno;
+
+  |PedidoService|
+  :Alterar o pedido para CANCELADO;
+  if (Estado anterior era RECEBIDO?) then (sim)
+    |Reserva, estoque e benefícios|
+    :Devolver os itens ao estoque;
+  else (não — preparação, pronto ou entregue)
+    :Não devolver itens já processados ao estoque;
+  endif
+
+  |Reserva, estoque e benefícios|
+  :Liberar o cupom, devolver pontos utilizados\ne remover pontos concedidos;
+
+  |PedidoService|
+  :Persistir o cancelamento e registrar auditoria;
+
+  |Origem do fluxo|
+  :Receber HTTP 200 com o pedido cancelado\ne o estorno confirmado;
+  stop
+
+else (expiração automática)
+  :Agendador inicia a verificação periódica;
+
+  |Reserva, estoque e benefícios|
+  :Buscar pedidos AGUARDANDO_PAGAMENTO\ncom prazo de reserva vencido;
+
+  if (Existem reservas vencidas?) then (não)
+    :Encerrar a execução sem alterações;
+    stop
+  else (sim)
+    :Para cada pedido vencido, alterar para CANCELADO;
+    :Devolver ao estoque os itens reservados;
+    :Liberar o cupom e devolver os pontos utilizados;
+    :Persistir as compensações e registrar\nmotivo PRAZO_EXPIRADO;
+    stop
+  endif
+endif
+
+legend bottom
+  A expiração alcança somente pedidos que permanecem em AGUARDANDO_PAGAMENTO.
+  Pedidos pagos somente são cancelados após a confirmação do estorno pelo gateway.
+  As alterações locais de cada fluxo são executadas em contexto transacional.
+endlegend
+
+@enduml

@@ -1,0 +1,73 @@
+@startuml
+
+left to right direction
+scale max 1500 width
+skinparam dpi 150
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype polyline
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor black
+}
+
+actor "Atendente\n(Balcão)" as Atendente
+actor "Cozinha" as Cozinha
+
+rectangle "Sistema Raízes do Nordeste\nAPI Back-End" {
+  package "Acesso e consulta" {
+    usecase "UC02\nAutenticar-se" as UC02
+    usecase "UC03\nConsultar catálogo" as UC03
+    usecase "UC04\nConsultar disponibilidade\npor unidade" as UC04
+    usecase "UC10\nConsultar pedidos" as UC10
+    usecase "UC12\nConsultar tentativas\nde pagamento" as UC12
+    usecase "UC16\nConsultar unidades" as UC16
+  }
+
+  package "Operação do pedido" {
+    usecase "UC09\nRegistrar pedido assistido" as UC09
+    usecase "UC15\nAtualizar estado operacional" as UC15
+  }
+}
+
+Atendente -- UC02
+Atendente -- UC03
+Atendente -- UC04
+Atendente -- UC09
+Atendente -- UC10
+Atendente -- UC12
+Atendente -- UC15
+Atendente -- UC16
+
+Cozinha -- UC02
+Cozinha -- UC04
+Cozinha -- UC10
+Cozinha -- UC12
+Cozinha -- UC15
+Cozinha -- UC16
+
+note bottom of UC04
+  Atendente e cozinha consultam somente
+  a disponibilidade das unidades vinculadas.
+end note
+
+note bottom of UC09
+  O atendente associa o pedido somente a cliente
+  previamente cadastrado e atua em unidade vinculada.
+end note
+
+note bottom of UC15
+  A atualização respeita a máquina de estados
+  e o vínculo do funcionário com a unidade.
+end note
+@enduml

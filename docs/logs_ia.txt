@@ -1,0 +1,1254 @@
+================================================================================
+LOG UNIFICADO - PROJETO RAÍZES DO NORDESTE (BACKEND)
+Escopo: API RESTful em Java (Spring Boot)
+================================================================================
+
+NATUREZA DO REGISTRO:
+Este arquivo constitui uma consolidação retrospectiva e sintética das consultas
+realizadas. Os prompts e as respostas foram resumidos ou parafraseados para
+eliminar repetições. As decisões registram o estágio correspondente do
+desenvolvimento e podem ter sido posteriormente revistas. O código-fonte, o
+README e o memorial técnico representam o estado final da solução.
+
+================================================================================
+FASE 0 - FUNDAMENTOS E TRANSIÇÃO
+================================================================================
+
+S000.1 - Estrutura de Camadas Spring Boot
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de separação de responsabilidades entre Controller, Service e
+Repository em uma API REST Spring Boot? Me dê um exemplo conceitual de fluxo.
+
+[RESPOSTA]
+A separação segue o princípio de responsabilidade única:
+
+1. Controller: recebe requisições HTTP, valida entrada, delega ao Service e
+   retorna resposta. Não contém lógica de negócio.
+   Exemplo conceitual:
+   @RestController
+   @RequestMapping("/produtos")
+   public class ProdutoController {
+       private final ProdutoService service;
+       // construtor
+       @PostMapping
+       public ResponseEntity<ProdutoResponse> criar(@RequestBody @Valid ProdutoRequest req) {
+           ProdutoResponse resp = service.criar(req);
+           return ResponseEntity.status(HttpStatus.CREATED).body(resp);
+       }
+   }
+
+2. Service: contém regras de negócio, orquestra repositórios, aplica
+   transações.
+   Exemplo conceitual:
+   @Service
+   @Transactional
+   public class ProdutoService {
+       public ProdutoResponse criar(ProdutoRequest req) {
+           validarNomeUnico(req.nome());
+           Produto entidade = mapper.toEntity(req);
+           return mapper.toResponse(repositorio.save(entidade));
+       }
+   }
+
+3. Repository: abstrai acesso ao banco (Spring Data JPA).
+   Exemplo conceitual:
+   public interface ProdutoRepository extends JpaRepository<Produto, Long> {
+       boolean existsByNome(String nome);
+   }
+
+Lógica: Controller → Service → Repository → Banco. Retorno inverso.
+
+[DECISAO]
+Estrutura de camadas adotada e aplicada manualmente em todos os módulos.
+
+--------------------------------------------------------------------------------
+S000.2 - DTOs vs Entidades JPA
+--------------------------------------------------------------------------------
+[PROMPT]
+Por que não expor diretamente a entidade JPA no endpoint? Qual a lógica por
+trás do uso de DTOs? Me dê um exemplo.
+
+[RESPOSTA]
+Expor entidade JPA causa:
+- Vazamento de estrutura interna (acoplamento)
+- Exposição acidental de campos sensíveis (senha, tokens)
+- Dificuldade de versionar contratos
+- Problemas com lazy loading (LazyInitializationException)
+
+Lógica do DTO: camada de contrato externa, imutável, validada.
+Exemplo conceitual (Java 17+ record):
+public record ProdutoRequest(
+    @NotBlank String nome,
+    @NotNull @DecimalMin("0.01") BigDecimal preco
+) {}
+
+public record ProdutoResponse(Long id, String nome, BigDecimal preco) {}
+
+Mapeamento manual no Service:
+Produto entidade = new Produto(req.nome(), req.preco(), unidade);
+ProdutoResponse resp = new ProdutoResponse(entidade.getId(), entidade.getNome(), entidade.getPreco());
+
+[DECISAO]
+Uso de DTOs próprios para entrada e saída, sem exposição direta das entidades.
+Records foram empregados em estruturas imutáveis específicas; os demais DTOs
+utilizam classes Java. O mapeamento permanece explícito na aplicação.
+
+--------------------------------------------------------------------------------
+S000.3 - Validação com Bean Validation
+--------------------------------------------------------------------------------
+[PROMPT]
+Como validar entrada de dados em endpoints REST? Qual a lógica do @Valid e
+como capturar erros de forma padronizada?
+
+[RESPOSTA]
+Lógica: anotações JSR-380 no DTO + @Valid no parâmetro do controller.
+
+Exemplo conceitual no DTO:
+public record PedidoRequest(
+    @NotNull Long clienteId,
+    @NotNull @Size(min = 1) List<ItemPedidoRequest> itens,
+    @Pattern(regexp = "BALCAO|DELIVERY|MESA") String canal
+) {}
+
+No controller:
+@PostMapping
+public ResponseEntity<?> criar(@RequestBody @Valid PedidoRequest req) { ... }
+
+Quando a validação falha, o Spring lança MethodArgumentNotValidException.
+A lógica de captura é centralizada em @RestControllerAdvice:
+@ExceptionHandler(MethodArgumentNotValidException.class)
+public ResponseEntity<ErrorResponse> handle(MethodArgumentNotValidException ex) {
+    List<String> detalhes = ex.getBindingResult().getFieldErrors().stream()
+        .map(e -> e.getField() + ": " + e.getDefaultMessage())
+        .toList();
+    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+        .body(new ErrorResponse("VALIDACAO_FALHOU", "Dados inválidos", detalhes));
+}
+
+[DECISAO]
+Validação declarativa com Bean Validation e handler global de erros 422.
+
+--------------------------------------------------------------------------------
+S000.4 - JPA: Relações e Lazy vs Eager
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de escolha entre FetchType.LAZY e EAGER no JPA? Como evitar
+N+1 queries ao listar pedidos com itens?
+
+[RESPOSTA]
+Lógica:
+- LAZY (padrão para @OneToMany/@ManyToMany): carrega sob demanda. Evita
+  carregar dados desnecessários, mas exige transação aberta ao acessar.
+- EAGER (padrão para @ManyToOne/@OneToOne): carrega junto. Risco de carregar
+  árvore inteira desnecessariamente.
+
+Regra prática: quase sempre LAZY. Carregamento explícito quando necessário.
+
+Para evitar N+1, usar JPQL com JOIN FETCH:
+@Query("SELECT p FROM Pedido p JOIN FETCH p.itens i JOIN FETCH i.produto " +
+       "WHERE p.unidade.id = :unidadeId")
+List<Pedido> listarComItens(@Param("unidadeId") Long unidadeId);
+
+Ou EntityGraph:
+@EntityGraph(attributePaths = {"itens", "itens.produto"})
+@Query("SELECT p FROM Pedido p WHERE p.unidade.id = :unidadeId")
+List<Pedido> listarComItens(@Param("unidadeId") Long unidadeId);
+
+[DECISAO]
+FetchType.LAZY em todas as coleções. JOIN FETCH ou EntityGraph para casos
+de leitura específica.
+
+--------------------------------------------------------------------------------
+S000.5 - Transações e @Transactional
+--------------------------------------------------------------------------------
+[PROMPT]
+Quando e como usar @Transactional? Qual a lógica de propagação e rollback?
+
+[RESPOSTA]
+Lógica: @Transactional demarca unidade de trabalho. Commit no fim do método
+se não houver exceção; rollback automático em RuntimeException.
+
+Exemplo conceitual:
+@Service
+public class PedidoService {
+    @Transactional
+    public PedidoResponse criar(PedidoRequest req) {
+        validarEstoque(req.itens());         // leitura
+        Pedido pedido = montarPedido(req);   // escrita
+        debitarEstoque(req.itens());         // escrita
+        return mapper.toResponse(repo.save(pedido));
+    }
+}
+
+Propagações comuns:
+- REQUIRED (padrão): participa da transação existente ou cria nova.
+- REQUIRES_NEW: sempre cria nova transação (útil para logs de auditoria).
+- SUPPORTS: usa a existente se houver, senão executa sem transação.
+
+Rollback seletivo:
+@Transactional(noRollbackFor = RegraNegocioLeveException.class)
+
+Cuidado: @Transactional não funciona em chamadas internas da mesma classe
+(proxy do Spring).
+
+[DECISAO]
+@Transactional apenas em métodos de Service que envolvem escrita ou múltiplas
+leituras consistentes.
+
+--------------------------------------------------------------------------------
+S000.6 - Autenticação JWT: Conceito e Fluxo
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica do fluxo JWT em uma API stateless? Por que stateless?
+
+[RESPOSTA]
+Lógica stateless: o servidor NÃO guarda sessão. Cada request carrega sua
+própria prova de identidade (o token).
+
+Fluxo:
+1. Cliente envia credenciais → POST /auth/login
+2. Servidor valida e emite JWT assinado (HS256 ou RS256) contendo:
+   - sub (identificador do usuário)
+   - roles (CLIENTE, FUNCIONARIO, ADMIN)
+   - exp (expiração)
+3. Cliente armazena token e envia em cada request via header:
+   Authorization: Bearer <token>
+4. Filtro intercepta, valida assinatura e expiração, popula SecurityContext.
+
+Vantagens stateless:
+- Escalabilidade horizontal (sem sessão em memória)
+- Simplicidade para mobile/SPA
+- Facilita microserviços
+
+Desvantagens:
+- Não há revogação imediata (solução: blacklist curta ou tokens de curta
+  duração + refresh token)
+
+Exemplo conceitual de filtro:
+public class JwtFilter extends OncePerRequestFilter {
+    protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res,
+                                    FilterChain chain) {
+        String header = req.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            String token = header.substring(7);
+            Claims claims = jwtService.validar(token);
+            Authentication auth = jwtService.toAuthentication(claims);
+            SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+        chain.doFilter(req, res);
+    }
+}
+
+[DECISAO]
+JWT stateless com claims customizados (roles + unidadeIds). Filtro próprio
+populando SecurityContext.
+
+--------------------------------------------------------------------------------
+S000.7 - Spring Security: Cadeia de Filtros
+--------------------------------------------------------------------------------
+[PROMPT]
+Como funciona a cadeia de filtros do Spring Security 6? Qual a lógica de
+configurar autorizações por rota?
+
+[RESPOSTA]
+Lógica: SecurityFilterChain é uma lista ordenada de filtros. Cada request
+passa por todos até ser aceito, rejeitado ou redirecionado.
+
+Exemplo conceitual de configuração:
+@Bean
+public SecurityFilterChain chain(HttpSecurity http) throws Exception {
+    return http
+        .csrf(AbstractHttpConfigurer::disable)           // API stateless
+        .sessionManagement(s -> s.sessionCreationPolicy(STATELESS))
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/auth/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/produtos/**").hasAnyRole("CLIENTE", "FUNCIONARIO", "ADMIN")
+            .requestMatchers("/admin/**").hasRole("ADMIN")
+            .anyRequest().authenticated()
+        )
+        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+        .exceptionHandling(ex -> ex
+            .authenticationEntryPoint(entryPoint401)
+            .accessDeniedHandler(handler403)
+        )
+        .build();
+}
+
+Regras de precedência:
+- Primeira regra que casa é a aplicada (ordem importa).
+- requestMatchers com path variable no meio: usar * (não **).
+- hasRole("ADMIN") verifica autoridade "ROLE_ADMIN".
+
+[DECISAO]
+SecurityFilterChain stateless, CSRF desabilitado, JWT filter antes do
+UsernamePasswordAuthenticationFilter.
+
+--------------------------------------------------------------------------------
+S000.8 - REST: Verbos HTTP e Códigos de Status
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de escolha entre POST, GET, PUT, PATCH e DELETE? E os códigos
+200, 201, 204, 400, 401, 403, 404, 409, 422, 500?
+
+[RESPOSTA]
+Verbos (semântica):
+- GET: leitura idempotente.
+- POST: criação de recurso.
+- PUT: substituição completa (idempotente).
+- PATCH: atualização parcial (idempotente).
+- DELETE: remoção (idempotente).
+
+Status (lógica):
+- 200 OK: sucesso com corpo.
+- 201 Created: recurso criado (retornar Location).
+- 204 No Content: sucesso sem corpo (ex: DELETE).
+- 400 Bad Request: payload malformado.
+- 401 Unauthorized: não autenticado.
+- 403 Forbidden: autenticado mas sem permissão.
+- 404 Not Found: recurso inexistente.
+- 409 Conflict: conflito de estado (ex: duplicidade, idempotência).
+- 422 Unprocessable Entity: payload válido sintaticamente, mas semanticamente
+  inválido (erros de validação de negócio/DTO).
+- 500 Internal Server Error: falha não tratada.
+
+Idempotência: GET, PUT, DELETE podem ser repetidos sem efeito colateral
+adicional. POST e PATCH (na prática) também, mas a semântica formal é mais
+fraca para PATCH.
+
+[DECISAO]
+Convenção REST aplicada: PATCH para status, 422 para validação, 409 para
+conflitos de negócio.
+
+--------------------------------------------------------------------------------
+S000.9 - Tratamento de Exceções Centralizado
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de um handler global de exceções? Por que centralizar?
+
+[RESPOSTA]
+Lógica: um único ponto transforma exceções em respostas HTTP padronizadas.
+Evita duplicação, garante contrato uniforme.
+
+Exemplo conceitual:
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(RecursoNaoEncontradoException.class)
+    public ResponseEntity<ErrorResponse> handle404(RecursoNaoEncontradoException ex,
+                                                   HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(new ErrorResponse(ex.getCodigo(), ex.getMessage(),
+                                    List.of(), Instant.now(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(RegraNegocioException.class)
+    public ResponseEntity<ErrorResponse> handle409(RegraNegocioException ex,
+                                                   HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(new ErrorResponse(ex.getCodigo(), ex.getMessage(),
+                                    List.of(), Instant.now(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handle422(MethodArgumentNotValidException ex,
+                                                   HttpServletRequest req) {
+        List<String> detalhes = ex.getBindingResult().getFieldErrors().stream()
+            .map(e -> e.getField() + ": " + e.getDefaultMessage()).toList();
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+            .body(new ErrorResponse("VALIDACAO_FALHOU", "Dados inválidos",
+                                    detalhes, Instant.now(), req.getRequestURI()));
+    }
+}
+
+Vantagens:
+- Contrato uniforme (RNF de padronização).
+- Facilita testes (asserts em schema fixo).
+- Frontend consome erros de forma previsível.
+
+[DECISAO]
+@RestControllerAdvice com ErrorResponse imutável e handlers por tipo de
+exceção.
+
+--------------------------------------------------------------------------------
+S000.10 - Testes Unitários com Mockito
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de isolar o Service em teste unitário usando Mockito?
+
+[RESPOSTA]
+Lógica: mockar dependências (Repository, outros Services) para testar apenas
+a lógica do Service sob teste.
+
+Exemplo conceitual:
+@ExtendWith(MockitoExtension.class)
+class PedidoServiceTest {
+
+    @Mock private PedidoRepository repository;
+    @Mock private EstoqueService estoqueService;
+    @InjectMocks private PedidoService service;
+
+    @Test
+    void deveCriarPedidoQuandoEstoqueSuficiente() {
+        // given
+        PedidoRequest req = umPedidoValido();
+        doNothing().when(estoqueService).validarDisponibilidade(req.itens());
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // when
+        PedidoResponse resp = service.criar(req);
+
+        // then
+        assertThat(resp.id()).isNotNull();
+        verify(estoqueService).validarDisponibilidade(req.itens());
+        verify(repository).save(any(Pedido.class));
+    }
+
+    @Test
+    void deveLancarExcecaoQuandoEstoqueInsuficiente() {
+        PedidoRequest req = umPedidoValido();
+        doThrow(new RegraNegocioException("ESTOQUE_INSUFICIENTE"))
+            .when(estoqueService).validarDisponibilidade(req.itens());
+
+        assertThatThrownBy(() -> service.criar(req))
+            .isInstanceOf(RegraNegocioException.class)
+            .hasMessageContaining("ESTOQUE_INSUFICIENTE");
+    }
+}
+
+Padrão AAA: Arrange (given), Act (when), Assert (then).
+
+[DECISAO]
+Testes unitários de Service com Mockito, cobrindo caminhos felizes e de
+exceção.
+
+--------------------------------------------------------------------------------
+S000.11 - Testes de Integração com @SpringBootTest
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a diferença entre teste unitário e de integração? Como testar o
+controller com MockMvc?
+
+[RESPOSTA]
+Diferença:
+- Unitário: uma classe isolada, dependências mockadas. Rápido.
+- Integração: várias camadas reais (ou quase). Mais lento, mais realista.
+
+Exemplo conceitual com MockMvc:
+@SpringBootTest
+@AutoConfigureMockMvc
+class PedidoControllerIntegrationTest {
+
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper mapper;
+
+    @Test
+    void deveRetornar422QuandoItensVazios() throws Exception {
+        PedidoRequest req = new PedidoRequest(1L, List.of(), "BALCAO");
+
+        mockMvc.perform(post("/pedidos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req))
+                .with(tokenCliente()))
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.error").value("VALIDACAO_FALHOU"))
+            .andExpect(jsonPath("$.details").isArray());
+    }
+}
+
+Vantagem: testa roteamento, validação, serialização e segurança juntos.
+
+[DECISAO]
+Combinação de testes unitários para serviços e autorização com testes de
+integração voltados ao contexto Spring, às migrações, à persistência, à
+concorrência e à geração do contrato OpenAPI. O contrato HTTP também é
+exercitado pela coleção Postman.
+
+--------------------------------------------------------------------------------
+S000.12 - Padrões de URL e Versionamento
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de design de URLs REST? Como versionar a API?
+
+[RESPOSTA]
+Lógica de URLs:
+- Substantivos no plural, minúsculos, separados por hífen: /pedidos-itens.
+- Hierarquia clara: /unidades/{id}/produtos.
+- Query params para filtros: /produtos?unidadeId=5&nome=tapioca.
+- Evitar verbos na URL: usar verbo HTTP, não /produtos/buscar.
+
+Versionamento (opções):
+1. URL: /v1/pedidos (explícito, simples).
+2. Header customizado: Accept: application/vnd.raizes.v1+json.
+3. Parâmetro: ?version=1 (menos recomendado).
+
+Recomendação para projetos acadêmicos/pequenos: versionar por URL (/v1).
+
+[DECISAO]
+URLs RESTful com substantivos plurais. Versionamento por URL quando houver
+breaking change.
+
+--------------------------------------------------------------------------------
+S000.13 - Paginação e Ordenação
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de paginação em APIs REST com Spring Data?
+
+[RESPOSTA]
+Lógica: Pageable abstrai page, size e sort.
+
+Exemplo conceitual:
+@GetMapping
+public Page<ProdutoResponse> listar(@PageableDefault(size = 20, sort = "nome")
+                                    Pageable pageable) {
+    return repository.findAll(pageable).map(mapper::toResponse);
+}
+
+Resposta típica (envelopada):
+{
+  "content": [...],
+  "page": 0,
+  "size": 20,
+  "totalElements": 142,
+  "totalPages": 8
+}
+
+Query params: ?page=0&size=20&sort=nome,asc
+
+Cuidado: limitar size máximo para evitar abuso:
+Pageable safe = PageRequest.of(
+    pageable.getPageNumber(),
+    Math.min(pageable.getPageSize(), 100),
+    pageable.getSort()
+);
+
+[DECISAO]
+Pageable do Spring Data com envelope de resposta e limite máximo de size.
+
+--------------------------------------------------------------------------------
+S000.14 - Soft Delete vs Hard Delete
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de escolher entre soft delete e hard delete? Como implementar
+soft delete no JPA?
+
+[RESPOSTA]
+Lógica:
+- Hard delete: remove fisicamente. Simples, mas perde histórico e quebra
+  integridade referencial.
+- Soft delete: marca como inativo. Preserva histórico, auditoria e
+  referências.
+
+Implementação JPA:
+@Entity
+@Table(name = "produto")
+@SQLRestriction("ativo = true")   // Hibernate 6+
+public class Produto {
+    @Column(nullable = false)
+    private boolean ativo = true;
+
+    public void inativar() { this.ativo = false; }
+}
+
+Endpoint:
+@DeleteMapping("/{id}")
+public ResponseEntity<Void> inativar(@PathVariable Long id) {
+    service.inativar(id);
+    return ResponseEntity.noContent().build();
+}
+
+Vantagens:
+- Histórico preservado (pedidos antigos continuam legíveis).
+- Possibilidade de "restaurar".
+- Conformidade com auditoria.
+
+[DECISAO]
+Exclusão lógica por indicadores de atividade e consultas específicas nos
+serviços e repositórios. A solução final não utiliza @SQLRestriction.
+
+--------------------------------------------------------------------------------
+S000.15 - Idempotência em Operações Críticas
+--------------------------------------------------------------------------------
+[PROMPT]
+Como garantir que um pagamento não seja processado duas vezes se o cliente
+clicar duas vezes?
+
+[RESPOSTA]
+Lógica: verificar estado antes de processar (idempotência de negócio).
+
+Exemplo conceitual:
+@Service
+public class PagamentoService {
+    @Transactional
+    public PagamentoResponse processar(Long pedidoId, PagamentoRequest req) {
+        Pedido pedido = pedidoRepo.findById(pedidoId)
+            .orElseThrow(() -> new RecursoNaoEncontradoException("PEDIDO_NAO_ENCONTRADO"));
+
+        // Idempotência: se já existe pagamento aprovado, retorna o existente.
+        pagamentoRepo.findByPedidoAndStatus(pedido, StatusPagamento.APROVADO)
+            .ifExists(p -> throw new RegraNegocioException("PAGAMENTO_JA_PROCESSADO"));
+
+        Pagamento pagamento = gatewayMock.chamar(pedido, req);
+        pagamentoRepo.save(pagamento);
+        return mapper.toResponse(pagamento);
+    }
+}
+
+Alternativa avançada: header Idempotency-Key (RFC draft), com tabela de
+chaves já processadas.
+
+[DECISAO]
+No pagamento, a repetição é protegida pela verificação do estado e pelo
+bloqueio pessimista do pedido. Na criação do pedido, a aplicação também aceita
+Idempotency-Key e rejeita a reutilização da chave com conteúdo diferente.
+
+--------------------------------------------------------------------------------
+S000.16 - CORS e Segurança de Frontend
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica do CORS e quando configurá-lo?
+
+[RESPOSTA]
+Lógica: navegador bloqueia requests cross-origin por padrão. O servidor
+precisa autorizar explicitamente via headers.
+
+Exemplo conceitual:
+@Bean
+public CorsConfigurationSource corsSource() {
+    CorsConfiguration cfg = new CorsConfiguration();
+    cfg.setAllowedOrigins(List.of("http://localhost:5173")); // Vite/SolidJS
+    cfg.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
+    cfg.setAllowedHeaders(List.of("*"));
+    cfg.setAllowCredentials(true);
+    cfg.setExposedHeaders(List.of("Authorization", "Location"));
+
+    UrlBasedCorsConfigurationSource src = new UrlBasedCorsConfigurationSource();
+    src.registerCorsConfiguration("/**", cfg);
+    return src;
+}
+
+@Bean
+public SecurityFilterChain chain(HttpSecurity http) throws Exception {
+    return http.cors(Customizer.withDefaults()) /* ... */ .build();
+}
+
+Regras:
+- Em produção: restringir origens (nunca "*").
+- Expor apenas headers necessários.
+- allowCredentials=true exige origem específica (não "*").
+
+[DECISAO]
+CORS configurado com origens específicas por perfil (dev/prod).
+
+--------------------------------------------------------------------------------
+S000.17 - Migrations com Flyway
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de usar migrations versionadas (Flyway) em vez de deixar o
+Hibernate criar o schema?
+
+[RESPOSTA]
+Lógica: migrations garantem:
+- Schema reproduzível em qualquer ambiente.
+- Evolução controlada (histórico de mudanças).
+- Compatível com CI/CD e múltiplos desenvolvedores.
+- Dados iniciais (seed) versionados.
+
+Estrutura típica:
+src/main/resources/db/migration/
+  V1__criar_tabelas_basicas.sql
+  V2__adicionar_unidades.sql
+  V3__criar_pedidos.sql
+  V4__ajustes_lgpd.sql
+
+Regras Flyway:
+- Nome: V<numero>__<descricao>.sql
+- Nunca alterar migration já aplicada (criar nova).
+- Para consolidar em ambiente limpo: squash em V1 único (apenas antes do
+  primeiro deploy em produção).
+
+Exemplo conceitual:
+-- V1__schema_completo.sql
+CREATE TABLE usuario (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    nome VARCHAR(120) NOT NULL,
+    email VARCHAR(160) NOT NULL UNIQUE,
+    senha_hash VARCHAR(255) NOT NULL,
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+[DECISAO]
+Flyway com migrations versionadas. Schema consolidado em V1 para
+reinstalação limpa.
+
+--------------------------------------------------------------------------------
+S000.18 - Perfis de Aplicação (dev/test/prod)
+--------------------------------------------------------------------------------
+[PROMPT]
+Como organizar configurações por ambiente no Spring Boot?
+
+[RESPOSTA]
+Lógica: application-{profile}.properties (ou yml) sobrescreve o base.
+
+Estrutura:
+src/main/resources/
+  application.properties          # base (comum)
+  application-dev.properties      # dev (H2, log DEBUG, pagamento mock)
+  application-test.properties     # teste (H2, log WARN)
+  application-prod.properties     # produção (PostgreSQL, log INFO)
+
+Ativação:
+java -jar app.jar --spring.profiles.active=prod
+
+Exemplo conceitual (dev):
+spring.datasource.url=jdbc:h2:mem:raizes
+spring.jpa.show-sql=true
+app.pagamento.forcar-status=
+
+Exemplo conceitual (prod):
+spring.datasource.url=jdbc:postgresql://${DB_HOST}:5432/raizes
+spring.jpa.show-sql=false
+logging.level.root=INFO
+
+Regra: NUNCA colocar credenciais reais no repositório. Usar variáveis de
+ambiente (${DB_PASSWORD}).
+
+[DECISAO]
+Três perfis (dev, test, prod) com segredos via variáveis de ambiente.
+
+--------------------------------------------------------------------------------
+S000.19 - Logs e Auditoria
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de logging estruturado e como auditar operações sensíveis?
+
+[RESPOSTA]
+Lógica de logging:
+- Usar SLF4J + Logback.
+- Níveis: ERROR (falhas), WARN (anomalias), INFO (eventos de negócio),
+  DEBUG (detalhes técnicos).
+- Nunca logar dados sensíveis (senha, token, CPF completo).
+
+Exemplo conceitual:
+@Slf4j
+@Service
+public class PagamentoService {
+    public PagamentoResponse processar(Long pedidoId, PagamentoRequest req) {
+        log.info("Processando pagamento - pedidoId={}", pedidoId);
+        // ...
+        log.info("Pagamento aprovado - pedidoId={}, pagamentoId={}", pedidoId, pag.getId());
+        return mapper.toResponse(pag);
+    }
+}
+
+Auditoria de operações sensíveis (cancelamento, estorno):
+@Entity
+@Table(name = "auditoria_cancelamento")
+public class AuditoriaCancelamento {
+    @Id private Long id;
+    private Long pedidoId;
+    private Long usuarioId;
+    private String motivo;
+    private BigDecimal valorEstornado;
+    private Instant realizadoEm;
+}
+
+Regra: auditoria em tabela separada, imutável, apenas insert.
+
+[DECISAO]
+Logs SLF4J com correlação e pseudonimização, complementados pelos históricos
+persistidos em pedidos, pagamentos, cupons, consentimentos e movimentações de
+estoque. Não foi criada uma tabela exclusiva de auditoria de cancelamentos.
+
+--------------------------------------------------------------------------------
+S000.20 - OpenAPI/Swagger
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de documentar uma API com OpenAPI 3 no Spring Boot?
+
+[RESPOSTA]
+Lógica: springdoc-openapi gera especificação automaticamente a partir dos
+controllers.
+
+Dependência:
+implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.x'
+
+Configuração conceitual:
+@Bean
+public OpenAPI openAPI() {
+    return new OpenAPI()
+        .info(new Info()
+            .title("Raízes do Nordeste API")
+            .version("1.0")
+            .description("API REST para food service multicanal"));
+}
+
+Anotações enriquecedoras:
+@Operation(summary = "Criar pedido")
+@ApiResponses({
+    @ApiResponse(responseCode = "201", description = "Criado"),
+    @ApiResponse(responseCode = "422", description = "Validação falhou")
+})
+@PostMapping
+public ResponseEntity<PedidoResponse> criar(@RequestBody @Valid PedidoRequest req) { ... }
+
+Endpoints gerados:
+- /v3/api-docs (JSON)
+- /swagger-ui.html (UI)
+
+Segurança: proteger em produção ou desabilitar.
+
+[DECISAO]
+springdoc-openapi com documentação enriquecida por anotações. Swagger
+desabilitado em prod.
+
+
+================================================================================
+FASE 1 - FUNDAMENTAÇÃO E ARQUITETURA (Qwen)
+================================================================================
+
+S001 - Planejamento e Estoque
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a ordem lógica de desenvolvimento para 4 sprints? Faz sentido ter estoque
+global e por unidade? Qual o princípio arquitetural envolvido?
+
+[RESPOSTA]
+Cronograma por dependências. Remover campo global para evitar inconsistência
+(princípio Single Source of Truth).
+
+[DECISAO]
+Adotada modelagem exclusiva por unidade.
+
+--------------------------------------------------------------------------------
+S002 - Spring Security 6.x e JWT
+--------------------------------------------------------------------------------
+[PROMPT]
+Como resolver PatternParseException em rotas com path variable no meio? Qual a
+lógica para incluir claims customizados (roles/unidades) no JWT sem quebrar o
+stateless? Me dê um exemplo conceitual.
+
+[RESPOSTA]
+Usar * em vez de ** no meio de rotas. Para JWT, extrair claims no filter e
+popular o SecurityContext com as authorities.
+
+[DECISAO]
+Lógica compreendida e aplicada manualmente.
+
+--------------------------------------------------------------------------------
+S003 - Máquina de Estados e Idempotência
+--------------------------------------------------------------------------------
+[PROMPT]
+Quais transições de status são válidas? Qual a lógica de idempotência para
+evitar pagamento duplicado? Como validar isso antes de processar?
+
+[RESPOSTA]
+Matriz de transições definida. Para evitar pagamentos concorrentes ou
+duplicados, verificar o estado do pedido e serializar o processamento por meio
+de bloqueio pessimista. Para a criação repetida do pedido, utilizar uma chave
+de idempotência vinculada ao registrador e ao conteúdo da solicitação.
+
+[DECISAO]
+Fluxo de estados, bloqueio do pagamento e criação idempotente implementados.
+
+--------------------------------------------------------------------------------
+S004 - Tratamento Global de Exceções
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a melhor arquitetura para padronizar respostas de erro globalmente? Me
+mostre um exemplo de DTO e handler. Como resolver InvalidDefinitionException
+com Instant?
+
+[RESPOSTA]
+Usar @RestControllerAdvice e DTO imutável. Registrar JavaTimeModule no
+ObjectMapper.
+
+[DECISAO]
+Handler global e serialização de datas configurados.
+
+--------------------------------------------------------------------------------
+S005 - LGPD e Anonimização
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica para implementar anonimização LGPD mantendo a integridade
+referencial? Me dê um exemplo de fluxo.
+
+[RESPOSTA]
+Anonimização irreversível (substituir dados por genéricos, manter ID e flag
+anonimizado=true).
+
+[DECISAO]
+Método de anonimização estruturado e aplicado.
+
+--------------------------------------------------------------------------------
+S006 - Pagamento Mock para Testes
+--------------------------------------------------------------------------------
+[PROMPT]
+Como estruturar a lógica de um gateway mock para forçar status via header ou
+config para testes? Qual a ordem de prioridade?
+
+[RESPOSTA]
+1. Header HTTP de simulação, quando expressamente habilitado no ambiente;
+2. propriedade de configuração; 3. resultado probabilístico como fallback.
+
+[DECISAO]
+Lógica de prioridade implementada no serviço.
+
+--------------------------------------------------------------------------------
+S007 - Motor de Descontos
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica matemática e a ordem de precedência para combinar campanha,
+cupom e pontos sem gerar valores negativos? Me dê um exemplo de cálculo.
+
+[RESPOSTA]
+1. Campanha (item), 2. Cupom (subtotal), 3. Pontos (saldo final). Validar
+valorFinal < 0.
+
+[DECISAO]
+Serviço de descontos estruturado com a ordem correta.
+
+--------------------------------------------------------------------------------
+S008 - Estratégia de Testes (Postman)
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a estrutura ideal de pastas para cobrir os RFs/RNFs? Qual a lógica dos
+scripts no Postman para capturar e persistir tokens dinamicamente? Me dê um
+exemplo.
+
+[RESPOSTA]
+11 pastas por domínio. Usar pm.environment.set() na aba Tests do login.
+
+[DECISAO]
+Coleção estruturada com captura dinâmica de tokens.
+
+--------------------------------------------------------------------------------
+S009 - Documentação e Ética de IA
+--------------------------------------------------------------------------------
+[PROMPT]
+Como reescrever a conclusão refletindo o escopo real? Como declarar o uso de
+IA focando em tutoria e não em cópia?
+
+[RESPOSTA]
+Naquela etapa, foram registrados 266 testes e 11 endpoints considerados no
+recorte então documentado. As métricas foram posteriormente superadas pela
+evolução e pela reorganização da suíte. Recomendada declaração transparente do
+uso da IA e manutenção da responsabilidade humana pelas decisões e validações.
+
+[DECISAO]
+Textos atualizados na etapa e métricas finais consolidadas posteriormente no
+memorial.
+
+--------------------------------------------------------------------------------
+S010 - Validação de Contratos
+--------------------------------------------------------------------------------
+[PROMPT]
+Quais cenários do roteiro faltam na coleção? Qual a lógica para validar
+schemas de erro no Postman? Me dê um exemplo de asserção.
+
+[RESPOSTA]
+Faltam estoque insuficiente, tipo inválido e canal inválido. Validar
+propriedades do JSON com pm.expect(data).to.have.property().
+
+[DECISAO]
+Requests negativos e validação de schema adicionados.
+
+
+================================================================================
+FASE 2 - REFINAMENTO, REGRAS DE NEGÓCIO E DOCUMENTAÇÃO (DeepSeek/ChatGPT)
+================================================================================
+(Sessões unificadas para evitar redundância entre as ferramentas)
+
+S011 - Análise Inicial
+--------------------------------------------------------------------------------
+[PROMPT]
+Analise o roteiro e a implementação, mapeando lacunas por criticidade.
+
+[RESPOSTA]
+Mapeamento de falhas em segurança, regras de negócio, contratos REST e testes.
+
+[DECISAO]
+Lista de lacunas adotada como roteiro.
+
+--------------------------------------------------------------------------------
+S012 - Lógica de Autorização
+--------------------------------------------------------------------------------
+[PROMPT]
+Quais são as regras de negócio e a lógica de autorização esperadas para
+restringir pedidos e pagamentos por propriedade e unidade? Me dê exemplos de
+expressões de controle de acesso.
+
+[RESPOSTA]
+Validação de propriedade do pedido, escopo de unidade para funcionários e uso
+de @PreAuthorize.
+
+[DECISAO]
+Controles de acesso e testes automatizados de autorização aplicados.
+
+--------------------------------------------------------------------------------
+S013 - Correção de Testes
+--------------------------------------------------------------------------------
+[PROMPT]
+Testes T32-T43 falharam. Quais ajustes de encadeamento e captura de variáveis
+são necessários?
+
+[RESPOSTA]
+Ajuste de tokens, variáveis de ambiente e scripts de pré-requisito.
+
+[DECISAO]
+Coleção Postman corrigida.
+
+--------------------------------------------------------------------------------
+S014 - Captura Resiliente no Postman
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica para capturar IDs de respostas aninhadas no Postman? Me dê um
+exemplo de script resiliente.
+
+[RESPOSTA]
+Usar optional chaining (jsonData.data?.id || jsonData.id) para evitar falhas
+se a estrutura mudar.
+
+[DECISAO]
+Scripts de captura atualizados.
+
+--------------------------------------------------------------------------------
+S015 - Políticas de Cancelamento
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica e as práticas de mercado para cancelamento de pedidos pagos?
+
+[RESPOSTA]
+Pedidos aguardando pagamento podem ser cancelados com liberação da reserva.
+Pedidos pagos podem ser cancelados com estorno integral e compensação dos
+benefícios. O estoque somente é devolvido quando o estágio indica que os itens
+ainda não foram consumidos; cancelamentos posteriores preservam o consumo
+operacional já ocorrido.
+
+[DECISAO]
+Política de estorno integral e compensações condicionadas ao estágio adotada.
+
+--------------------------------------------------------------------------------
+S016 - Fluxo de Estorno
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica de negócio e o fluxo de transação para cancelamento com estorno?
+Me dê um exemplo de como preservar o histórico e compensar benefícios.
+
+[RESPOSTA]
+Manter pedido e pagamento, registrar o código e o instante do estorno no
+pagamento, devolver estoque quando aplicável e compensar pontos e cupom. Os
+eventos também são registrados em logs correlacionados.
+
+[DECISAO]
+Fluxo transacional e testes implementados.
+
+--------------------------------------------------------------------------------
+S017 - Consolidação Postman
+--------------------------------------------------------------------------------
+[PROMPT]
+Como padronizar a nomenclatura (Txx) e dependências da coleção completa?
+
+[RESPOSTA]
+Agrupamento lógico, scripts de auth no nível da coleção e padronização de
+nomes.
+
+[DECISAO]
+Arquivo JSON consolidado.
+
+--------------------------------------------------------------------------------
+S018 - Modelagem de Auditoria
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a modelagem de dados e a lógica de auditoria para cancelamento de pedido
+pago com estorno? Me dê um exemplo de estrutura de tabelas.
+
+[RESPOSTA]
+Preservar pedido e pagamento, acrescentar ao pagamento os dados do estorno e
+manter nos recursos relacionados as evidências de compensação. Complementar a
+rastreabilidade com logs de ator, instante, motivo e resultado.
+
+[DECISAO]
+Rastreabilidade distribuída entre os registros persistentes do domínio e os
+logs estruturados; não foi criada tabela exclusiva de cancelamento ou
+reembolso.
+
+--------------------------------------------------------------------------------
+S019 - Evolução Incremental
+--------------------------------------------------------------------------------
+[PROMPT]
+Como validar o impacto de correções sequenciais em estoque, pagamentos e
+descontos?
+
+[RESPOSTA]
+Revisão isolada por domínio, atualização de testes unitários e verificação de
+regressão.
+
+[DECISAO]
+Projeto evoluído incrementalmente.
+
+--------------------------------------------------------------------------------
+S020 - Priorização
+--------------------------------------------------------------------------------
+[PROMPT]
+Como classificar as pendências restantes por peso acadêmico e obrigatório?
+
+[RESPOSTA]
+Obrigatórios: recursos do domínio, autenticação, autorização, regras de
+negócio, persistência, testes e documentação OpenAPI/Swagger. Proteção de dados,
+auditoria e concorrência também possuem alto impacto na aderência e na
+confiabilidade da solução.
+
+[DECISAO]
+Foco migrado para LGPD.
+
+--------------------------------------------------------------------------------
+S021 - Consentimento LGPD
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica e a modelagem para um consentimento LGPD versionado para pontos
+de fidelidade? Me dê um exemplo de fluxo de aceite e revogação.
+
+[RESPOSTA]
+Registrar o consentimento facultativo e versionado em consentimentos_lgpd e os
+aceites contratuais em aceites_documentos. Bloquear o uso de pontos sem
+consentimento vigente para a finalidade FIDELIDADE, mantendo o aceite geral dos
+termos separado desse consentimento.
+
+[DECISAO]
+Módulo de consentimento versionado integrado.
+
+--------------------------------------------------------------------------------
+S022 - Estratégia de Migrações
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a estratégia para consolidar múltiplas migrações em um schema V1 único?
+Me dê um exemplo de estrutura de script SQL ordenado.
+
+[RESPOSTA]
+Script único respeitando dependências de FKs, constraints e dados iniciais.
+
+[DECISAO]
+Migração V1 consolidada.
+
+--------------------------------------------------------------------------------
+S023 a S025 - Continuidade e Documentação
+--------------------------------------------------------------------------------
+[PROMPT]
+Como atualizar a documentação textual e gerar diagramas Mermaid (DER, Casos de
+Uso, Sequência) legíveis em A4?
+
+[RESPOSTA]
+Estrutura acadêmica unificada. Mermaid foi avaliado inicialmente; PlantUML foi
+adotado na versão final por oferecer representação UML e controle de layout
+mais adequados aos diagramas do projeto.
+
+[DECISAO]
+Documentação consolidada e fontes finais dos nove diagramas mantidas em
+PlantUML, acompanhadas das respectivas imagens renderizadas.
+
+--------------------------------------------------------------------------------
+S026 - Formatação ABNT
+--------------------------------------------------------------------------------
+[PROMPT]
+Como converter o Markdown para DOCX em formatação ABNT, com Arial, margens
+superior e esquerda de 3 cm e inferior e direita de 2 cm?
+
+[RESPOSTA]
+Estrutura de capas, sumários e tipografia configurada para exportação.
+
+[DECISAO]
+Documento base gerado.
+
+--------------------------------------------------------------------------------
+S027 - Redundância HTTP
+--------------------------------------------------------------------------------
+[PROMPT]
+Como eliminar a duplicidade de verbos (PUT/PATCH) na config de segurança e
+testes?
+
+[RESPOSTA]
+Remover PUT do SecurityConfig, README e adicionar asserção no teste OpenAPI
+para rejeitar PUT.
+
+[DECISAO]
+Contrato REST saneado. A execução então registrada possuía 338 testes; esse
+número representa uma etapa intermediária e foi posteriormente substituído
+pela suíte final selecionada.
+
+--------------------------------------------------------------------------------
+S028 e S029 - Precedência de Benefícios
+--------------------------------------------------------------------------------
+[PROMPT]
+Como documentar e formatar em ABNT a regra de precedência (Campanha -> Cupom
+-> Pontos)?
+
+[RESPOSTA]
+Texto técnico detalhado e formatação de alíneas (a, b, c, d) para Word.
+
+[DECISAO]
+Regra 12 documentada e formatada.
+
+--------------------------------------------------------------------------------
+S030 - Validação Dinâmica OpenAPI
+--------------------------------------------------------------------------------
+[PROMPT]
+Qual a lógica para contar dinamicamente as operações de um contrato OpenAPI no
+Postman? Me dê um exemplo de script de asserção.
+
+[RESPOSTA]
+Iterar sobre document.paths, filtrar métodos HTTP válidos e usar
+pm.expect(total).to.eql(49) para o contrato final.
+
+[DECISAO]
+Validação corrigida e posteriormente consolidada como T35 na coleção final,
+confirmando as 49 operações documentadas.
+
+--------------------------------------------------------------------------------
+S031 - Registro de IA
+--------------------------------------------------------------------------------
+[PROMPT]
+Como compilar o uso de IA de forma transparente e sintética?
+
+[RESPOSTA]
+Log sintético estruturado por sessões, registrando temas, propostas, decisões,
+revisões e resultados aproveitados no desenvolvimento.
+
+[DECISAO]
+Registro sintético criado.
+
+
+================================================================================
+RESUMO ESTATÍSTICO E DECLARAÇÃO
+================================================================================
+
+Total de Sessões Temáticas Consolidadas: 51 (20 de fundamentos + 31 de
+aplicação, refinamento e documentação)
+Ferramentas: Qwen, DeepSeek e OpenAI ChatGPT/Codex
+Foco das Interações:
+  - FASE 0: Fundamentos (camadas, DTOs, validação, JPA, transações, JWT,
+    Security, REST, exceções, testes, paginação, soft delete, idempotência,
+    CORS, migrations, perfis, logs, OpenAPI)
+  - FASE 1: Arquitetura e regras de negócio
+  - FASE 2: Refinamento, LGPD, auditoria e documentação
+
+DECLARAÇÃO DE USO DE IA:
+As ferramentas foram utilizadas no estudo de conceitos, na avaliação de
+alternativas, na identificação de inconsistências, na proposição de soluções e
+versões preliminares, na revisão de código e testes, na organização da coleção
+Postman, na orientação dos diagramas e na revisão do memorial técnico. As
+sugestões foram confrontadas com o roteiro e com o estado da implementação,
+sendo rejeitadas, modificadas ou incorporadas de forma adaptada conforme sua
+adequação. A responsabilidade pelas decisões adotadas, pela verificação dos
+resultados e pelas limitações da entrega permaneceu humana.
+
+ESTADO FINAL VALIDADO:
+  - 255 testes automatizados;
+  - 49 operações no contrato OpenAPI;
+  - 35 requisições na coleção Postman;
+  - 55 asserções de endpoint.
+
+================================================================================
+FIM DO LOG
+================================================================================

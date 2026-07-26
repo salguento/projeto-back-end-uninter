@@ -1,0 +1,276 @@
+@startuml
+
+' Diagrama UML baseado nas classes do pacote model.
+' Atributos de associação são representados pelas linhas para evitar duplicação.
+' Recomenda-se exportar em SVG e inserir em página A4 horizontal.
+
+left to right direction
+scale max 2400 width
+skinparam dpi 180
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor white
+  BorderColor black
+  FontColor black
+  ArrowColor black
+}
+skinparam package {
+  BackgroundColor white
+  BorderColor black
+  FontColor black
+}
+
+hide empty methods
+hide circle
+
+package "Identidade e acesso" {
+  class Usuario <<entity>> {
+    - id : Long
+    - nome : String
+    - email : String
+    - senha : String
+    - perfil : Perfil
+    - pontos : Integer
+    - telefone : String [0..1]
+    - cpf : String [0..1]
+    - anonimizado : Boolean
+    - unidades : Set<Unidade>
+  }
+
+  class UsuarioUnidade <<entity>> {
+    - id : Long
+  }
+
+  class ConsentimentoLgpd <<entity>> {
+    - id : Long
+    - finalidade : FinalidadeConsentimento
+    - versaoTermo : String
+    - concedido : Boolean
+    - registradoEm : LocalDateTime
+    - origem : String
+  }
+}
+
+package "Pedidos e pagamentos" {
+  class Pedido <<entity>> {
+    - id : Long
+    - canalPedido : CanalPedido
+    - status : StatusPedido
+    - valorTotal : BigDecimal
+    - criadoEm : LocalDateTime
+    - expiraEm : LocalDateTime
+    - desconto : BigDecimal
+    - pontosUtilizados : Integer
+    - pontosConcedidos : Integer
+    - formaPagamento : FormaPagamento
+    - pedidoInterno : Boolean
+    - chaveIdempotencia : String [0..1]
+    - hashRequisicao : String [0..1]
+    --
+    + adicionarItem(item : ItemPedido) : void
+  }
+
+  class ItemPedido <<entity>> {
+    - id : Long
+    - quantidade : Integer
+    - precoUnitario : BigDecimal
+  }
+
+  class Pagamento <<entity>> {
+    - id : Long
+    - formaPagamento : FormaPagamento
+    - valor : BigDecimal
+    - status : String
+    - codigoTransacao : String [0..1]
+    - codigoEstorno : String [0..1]
+    - estornadoEm : LocalDateTime [0..1]
+    - criadoEm : LocalDateTime
+  }
+}
+
+package "Catálogo e operação" {
+  class Unidade <<entity>> {
+    - id : Long
+    - nome : String
+    - endereco : String
+    - cidade : String
+    - estado : String
+    - cep : String
+    - telefone : String
+    - ativo : Boolean
+  }
+
+  class Produto <<entity>> {
+    - id : Long
+    - nome : String
+    - descricao : String [0..1]
+    - precoVigente : BigDecimal
+    - ativo : Boolean
+  }
+
+  class Estoque <<entity>> {
+    - id : Long
+    - quantidade : Integer
+  }
+
+  class MovimentacaoEstoque <<entity>> {
+    - id : Long
+    - tipo : TipoMovimentacaoEstoque
+    - quantidade : Integer
+    - saldoAnterior : Integer
+    - saldoPosterior : Integer
+    - motivo : String
+    - ator : String
+    - criadoEm : LocalDateTime
+    --
+    ~ preencherDataCriacao() : void
+  }
+}
+
+package "Campanhas e cupons" {
+  class Campanha <<entity>> {
+    - id : Long
+    - nome : String
+    - precoPromocional : BigDecimal
+    - dataInicio : LocalDateTime
+    - dataFim : LocalDateTime
+    - ativa : Boolean
+  }
+
+  class Cupom <<entity>> {
+    - id : Long
+    - codigo : String
+    - tipoDesconto : TipoDesconto
+    - valor : BigDecimal
+    - valorMinimoPedido : BigDecimal
+    - dataInicio : LocalDateTime
+    - dataFim : LocalDateTime
+    - ativo : Boolean
+    - usoMaximo : Integer [0..1]
+    - usoAtual : Integer
+  }
+
+  class CupomUsado <<entity>> {
+    - id : Long
+    - valorDesconto : BigDecimal
+    - utilizadoEm : LocalDateTime
+    - estornadoEm : LocalDateTime [0..1]
+  }
+}
+
+package "Tipos enumerados" {
+  enum Perfil {
+    CLIENTE
+    ATENDENTE
+    COZINHA
+    GERENTE
+    ADMIN
+  }
+
+  enum CanalPedido {
+    APP
+    TOTEM
+    BALCAO
+    WEB
+    PICKUP
+  }
+
+  enum StatusPedido {
+    AGUARDANDO_PAGAMENTO
+    RECEBIDO
+    EM_PREPARACAO
+    PRONTO
+    ENTREGUE
+    CANCELADO
+  }
+
+  enum FormaPagamento {
+    PIX
+    CARTAO
+    DINHEIRO
+  }
+
+  enum TipoDesconto {
+    PERCENTUAL
+    NOMINAL
+  }
+
+  enum TipoMovimentacaoEstoque {
+    ENTRADA
+    SAIDA
+  }
+
+  enum FinalidadeConsentimento {
+    FIDELIDADE
+  }
+}
+
+' Identidade, consentimento e escopo por unidade
+Usuario "1" -- "0..*" ConsentimentoLgpd : manifesta
+Usuario "0..*" -- "0..*" Unidade : unidades
+(Usuario, Unidade) .. UsuarioUnidade
+
+' Papéis exercidos no pedido
+Usuario "1" -- "0..*" Pedido : "titular / usuario"
+Usuario "0..1" -- "0..*" Pedido : cliente
+Usuario "0..1" -- "0..*" Pedido : usuarioRegistro
+Unidade "1" -- "0..*" Pedido : recebe
+
+' Agregado do pedido e histórico financeiro
+Pedido "1" *-- "1..*" ItemPedido : itens
+Produto "1" -- "0..*" ItemPedido : produto
+Pedido "1" -- "0..*" Pagamento : tentativas
+
+' Estoque e movimentações
+Unidade "0..*" -- "0..*" Produto : disponibilidade
+(Unidade, Produto) .. Estoque
+Estoque "1" -- "0..*" MovimentacaoEstoque : movimentações
+
+' Benefícios comerciais
+Unidade "1" -- "0..*" Campanha : disponibiliza
+Produto "1" -- "0..*" Campanha : promove
+Unidade "0..1" -- "0..*" Cupom : restringe
+Cupom "1" -- "0..*" CupomUsado : usos
+Pedido "1" -- "0..*" CupomUsado : aplicações
+Usuario "1" -- "0..*" CupomUsado : utilizações
+
+' Uso dos tipos enumerados
+Usuario ..> Perfil
+ConsentimentoLgpd ..> FinalidadeConsentimento
+Pedido ..> CanalPedido
+Pedido ..> StatusPedido
+Pedido ..> FormaPagamento
+Pagamento ..> FormaPagamento
+Cupom ..> TipoDesconto
+MovimentacaoEstoque ..> TipoMovimentacaoEstoque
+
+' Sugestões de posicionamento para uma página A4 horizontal.
+Usuario -[hidden]right-> Pedido
+Pedido -[hidden]right-> Unidade
+Unidade -[hidden]right-> Campanha
+Usuario -[hidden]down-> UsuarioUnidade
+UsuarioUnidade -[hidden]down-> ConsentimentoLgpd
+Pedido -[hidden]down-> ItemPedido
+ItemPedido -[hidden]down-> Pagamento
+Unidade -[hidden]down-> Produto
+Produto -[hidden]down-> Estoque
+Estoque -[hidden]down-> MovimentacaoEstoque
+Campanha -[hidden]down-> Cupom
+Cupom -[hidden]down-> CupomUsado
+
+legend bottom
+  |= Notação |= Significado |
+  | <<entity>> | classe persistente do domínio |
+  | enum | conjunto fechado de valores |
+  | *-- | composição |
+  | -- | associação |
+  | ..> | dependência de tipo |
+  | [0..1] | atributo ou associação opcional |
+endlegend
+
+@enduml
