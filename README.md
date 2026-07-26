@@ -494,6 +494,17 @@ as demais usam o esquema `bearerAuth`.
 - **OpenAPI JSON:** http://localhost:8080/api/v3/api-docs
 - **OpenAPI YAML:** http://localhost:8080/api/v3/api-docs.yaml
 
+### Contrato estático público
+
+Para permitir a consulta do contrato sem iniciar a aplicação, o repositório mantém cópias
+versionadas geradas pelo Springdoc:
+
+- [OpenAPI JSON](docs/openapi/openapi.json)
+- [OpenAPI YAML](docs/openapi/openapi.yaml)
+
+As duas representações correspondem ao contrato atual de 49 operações. A interface interativa
+do Swagger UI continua disponível ao executar a API localmente com o perfil `dev`.
+
 ### Autenticar no Swagger
 
 1. Clique no botão **"Authorize"** no canto superior direito
@@ -580,6 +591,7 @@ projeto-back-end-uninter/
 │   ├── diagramas-casos-de-uso/      # Figuras 1 a 4 e fontes PlantUML
 │   ├── diagramas-dados/             # Figuras 5 e 6 e fontes PlantUML
 │   ├── diagramas-fluxos/            # Figuras 7 a 9 e fontes PlantUML
+│   ├── openapi/                      # Contrato estático em JSON e YAML
 │   └── evidencias/                  # Resumos verificáveis das execuções de teste
 ├── postman/                         # Coleção com 35 chamadas encadeadas
 ├── .env.example                     # Template de variáveis de ambiente
