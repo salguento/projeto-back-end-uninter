@@ -1,0 +1,105 @@
+# ============================================
+# JAVA / MAVEN
+# ============================================
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+replay_pid*
+
+# ============================================
+# IDE - ECLIPSE
+# ============================================
+.classpath
+.project
+.settings/
+bin/
+*.swp
+*~.nib
+.metadata/
+
+# ============================================
+# ECLIPSE - ANNOTATION PROCESSING
+# ============================================
+.apt_generated/
+.apt_generated_tests/
+.factorypath
+
+# ============================================
+# IDE - INTELLIJ IDEA
+# ============================================
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ============================================
+# IDE - VS CODE
+# ============================================
+.vscode/
+*.code-workspace
+
+# ============================================
+# SISTEMA OPERACIONAL
+# ============================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*~
+
+# ============================================
+# AMBIENTE E SECRETS 
+# ============================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+application-local.properties
+
+# ============================================
+# SPRING BOOT
+# ============================================
+spring-boot-app.pid
+
+# ============================================
+# BANCO DE DADOS (ARQUIVOS LOCAIS)
+# ============================================
+*.db
+*.h2.db
+*.trace.db
+
+# ============================================
+# DOCUMENTACAO GERADA
+# ============================================
+docs/generated/
+apidocs/
+/4819398_Projeto_Back_End.[Pp][Dd][Ff]
+/docs/4819398_Projeto_Back_End.[Pp][Dd][Ff]
+
+# ============================================
+# ARQUIVOS TEMPORARIOS DO PROJETO
+# ============================================
+tmp/
+.codex-google-docs/
+
+# ============================================
+# DOCKER 
+# ============================================
+docker-compose.override.yml
+
+# ============================================
+# FLYWAY
+# ============================================
+flyway_schema_history*
