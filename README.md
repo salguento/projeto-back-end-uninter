@@ -4,7 +4,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.15-brightgreen?logo=spring)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Maven](https://img.shields.io/badge/Maven-3.9+-red?logo=apache-maven)](https://maven.apache.org/)
-[![Tests](https://img.shields.io/badge/Tests-255-blue)](#)
+[![CI](https://github.com/salguento/projeto-back-end-uninter/actions/workflows/ci.yml/badge.svg)](https://github.com/salguento/projeto-back-end-uninter/actions/workflows/ci.yml)
 
 > **Atividade prática de Projeto Back-End** - Tecnologia em Análise e Desenvolvimento de Sistemas  
 > **Centro Universitário Internacional UNINTER** - 2026  
@@ -739,3 +739,20 @@ Este projeto está licenciado sob a **GNU General Public License v3.0** - veja o
 - Derivados devem ser GPL v3
 - Código fonte deve ser disponibilizado
 - O mesmo aviso de copyright e licença deve ser preservado
+
+
+## Integração contínua (CI)
+
+O workflow [CI](.github/workflows/ci.yml) executa em pushes, pull requests e acionamento manual pelo GitHub Actions. O ambiente usa Ubuntu 24.04, Java 17 (Temurin) e a versão do Maven definida no Wrapper do repositório, com cache de dependências.
+
+Para reproduzir a verificação localmente:
+
+```bash
+./mvnw --batch-mode --no-transfer-progress clean verify
+```
+
+A execução compila a aplicação, executa os testes configurados e gera o pacote. Falhas de compilação ou de testes deixam o check vermelho. Os relatórios Surefire (e Failsafe, caso esse plugin seja configurado futuramente) são disponibilizados como artefatos por 14 dias, inclusive quando os testes falham. Se a compilação falhar antes de gerar relatórios, consulte os logs do job. O nome do artefato identifica o commit e a tentativa de execução.
+
+Consulte o [histórico das execuções](https://github.com/salguento/projeto-back-end-uninter/actions/workflows/ci.yml) para verificar o resultado e baixar os relatórios. O badge mostra o estado do workflow; a contagem atual de testes deve ser consultada nos relatórios, não em um número fixo no README.
+
+**Escopo:** a suíte atual usa H2. Este workflow não valida PostgreSQL, não executa a coleção Postman, não mede desempenho e não publica a aplicação. Os registros locais em `docs/evidencias` permanecem como evidência histórica. A configuração do workflow, isoladamente, não comprova uma execução bem-sucedida: confirme o resultado no histórico do Actions.
